@@ -1,0 +1,37 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /orders/{orderId} {
+      allow read: if true;
+      allow create: if request.resource.data.status == "queued"
+                    && request.resource.data.keys().hasOnly(
+                         ["name", "recipe", "status", "created_at", "rating"])
+                    && request.resource.data.rating == null;
+      allow update: if onlyRatingChanged()
+                    && request.resource.data.rating is int
+                    && request.resource.data.rating >= 1
+                    && request.resource.data.rating <= 5;
+      allow delete: if false;
+    }
+
+    match /machine/state {
+      allow read: if true;
+      allow write: if isMachine();
+    }
+
+    match /calibration/current {
+      allow read: if true;
+      allow write: if isMachine();
+    }
+
+    function onlyRatingChanged() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(["rating"]);
+    }
+
+    function isMachine() {
+      return request.auth != null && request.auth.token.role == "machine";
+    }
+  }
+}

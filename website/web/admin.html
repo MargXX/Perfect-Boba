@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BobaBot — Admin</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<main>
+  <h1>Admin</h1>
+  <div id="offline" class="machine-offline" hidden>Machine is offline.</div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Machine</h2>
+    <p id="machine-info">—</p>
+    <button id="pause" class="secondary">Pause queue</button>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Active queue</h2>
+    <ul id="active" class="order-list"></ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Recent completed</h2>
+    <ul id="done" class="order-list"></ul>
+  </div>
+</main>
+
+<script type="module">
+import {
+  MACHINE_STATE, doc, updateDoc, onSnapshot, query, where, orderBy, machineOnline, db
+} from "/app.js";
+import { collection, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+onSnapshot(MACHINE_STATE, (snap) => {
+  const d = snap.data() || {};
+  const online = machineOnline(d);
+  document.getElementById("offline").hidden = online;
+  document.getElementById("machine-info").textContent =
+    `busy=${d.is_busy ?? "?"} paused=${d.paused ?? false} current=${d.current_order_id ?? "—"}`;
+  document.getElementById("pause").textContent = d.paused ? "Resume queue" : "Pause queue";
+});
+
+document.getElementById("pause").addEventListener("click", async () => {
+  const cur = (await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js"))
+    .getDoc ? null : null;
+  await updateDoc(MACHINE_STATE, { paused_request: Date.now() });
+});
+
+const active = query(
+  collection(db, "orders"),
+  where("status", "in", ["queued","awaiting_cup","dispensing"]),
+  orderBy("created_at", "asc")
+);
+onSnapshot(active, (snap) => {
+  const list = document.getElementById("active"); list.innerHTML = "";
+  let n = 0;
+  snap.forEach(d => {
+    n++;
+    const x = d.data();
+    const li = document.createElement("li");
+    li.innerHTML = `<span>${n}. ${x.name} — T${x.recipe.tea}/S${x.recipe.sweet}/M${x.recipe.milk}${x.recipe.tapioca?"+🫧":""}</span>
+                    <span class="status-pill ${x.status}">${x.status}</span>`;
+    list.appendChild(li);
+  });
+  if (!n) list.innerHTML = "<li>Empty</li>";
+});
+
+const doneQ = query(
+  collection(db, "orders"),
+  where("status", "in", ["done","rated"]),
+  orderBy("created_at", "desc"),
+  limit(10)
+);
+onSnapshot(doneQ, (snap) => {
+  const list = document.getElementById("done"); list.innerHTML = "";
+  snap.forEach(d => {
+    const x = d.data();
+    const li = document.createElement("li");
+    li.innerHTML = `<span>${x.name}</span>
+                    <span>${x.rating ? "★".repeat(x.rating) : "unrated"}</span>`;
+    list.appendChild(li);
+  });
+});
+</script>
+</body>
+</html>

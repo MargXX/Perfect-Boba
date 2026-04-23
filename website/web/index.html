@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BobaBot — Order</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<main>
+  <h1>BobaBot</h1>
+  <p class="subtitle">End-of-year boba. Build your drink.</p>
+
+  <div id="offline" class="machine-offline" hidden>Machine is offline — hang tight.</div>
+
+  <form id="order-form" class="card">
+    <label for="name">Your name</label>
+    <input id="name" type="text" maxlength="20" placeholder="e.g. Michael" required>
+
+    <label>Tea strength <span class="slider-val" id="tea-val">50</span></label>
+    <div class="slider-row">
+      <input id="tea" type="range" min="0" max="100" value="50">
+    </div>
+
+    <label>Sweetness <span class="slider-val" id="sweet-val">50</span></label>
+    <div class="slider-row">
+      <input id="sweet" type="range" min="0" max="100" value="50">
+    </div>
+
+    <label>Milk <span class="slider-val" id="milk-val">40</span></label>
+    <div class="slider-row">
+      <input id="milk" type="range" min="0" max="100" value="40">
+    </div>
+
+    <label class="checkbox-row">
+      <input id="tapioca" type="checkbox" checked> Tapioca pearls
+    </label>
+
+    <button id="submit" type="submit">Place order</button>
+  </form>
+
+  <p class="subtitle" style="text-align:center">
+    Already ordered? <a href="/queue">check your place in line</a>
+  </p>
+</main>
+
+<script type="module">
+import {
+  ORDERS, MACHINE_STATE, addDoc, onSnapshot, serverTimestamp, saveOrderId, machineOnline
+} from "/app.js";
+
+for (const id of ["tea","sweet","milk"]) {
+  const el = document.getElementById(id);
+  const val = document.getElementById(id + "-val");
+  el.addEventListener("input", () => val.textContent = el.value);
+}
+
+onSnapshot(MACHINE_STATE, (snap) => {
+  document.getElementById("offline").hidden = machineOnline(snap.data());
+});
+
+document.getElementById("order-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById("submit");
+  btn.disabled = true; btn.textContent = "Placing…";
+  try {
+    const ref = await addDoc(ORDERS, {
+      name: document.getElementById("name").value.trim() || "Someone",
+      recipe: {
+        tea: Number(document.getElementById("tea").value),
+        sweet: Number(document.getElementById("sweet").value),
+        milk: Number(document.getElementById("milk").value),
+        tapioca: document.getElementById("tapioca").checked
+      },
+      status: "queued",
+      created_at: serverTimestamp(),
+      rating: null
+    });
+    saveOrderId(ref.id);
+    location.href = "/queue";
+  } catch (err) {
+    alert("Could not place order: " + err.message);
+    btn.disabled = false; btn.textContent = "Place order";
+  }
+});
+</script>
+</body>
+</html>

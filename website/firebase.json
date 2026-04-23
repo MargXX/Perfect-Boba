@@ -1,0 +1,16 @@
+{
+  "hosting": {
+    "public": "web",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "rewrites": [
+      { "source": "/order", "destination": "/index.html" },
+      { "source": "/queue", "destination": "/queue.html" },
+      { "source": "/rate/**", "destination": "/rate.html" },
+      { "source": "/admin", "destination": "/admin.html" }
+    ]
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
+}

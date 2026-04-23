@@ -1,0 +1,6 @@
+tools/serviceAccount.json
+.firebase/
+.firebaserc
+node_modules/
+firebase-debug.log
+firestore-debug.log

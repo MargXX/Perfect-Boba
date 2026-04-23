@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BobaBot — Queue</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<main>
+  <h1>Your order</h1>
+  <div id="no-order" class="card" hidden>
+    <p>No order found on this device.</p>
+    <button onclick="location.href='/'">Place an order</button>
+  </div>
+
+  <div id="offline" class="machine-offline" hidden>Machine is offline.</div>
+
+  <div id="order-card" class="card" hidden>
+    <p class="subtitle" id="greeting"></p>
+    <div class="position-label">You are</div>
+    <div class="position-big" id="position">—</div>
+    <div class="position-label" id="eta">in line</div>
+    <p style="text-align:center;margin-top:16px">
+      <span class="status-pill" id="status-pill">queued</span>
+    </p>
+    <div id="claim-banner" class="flash-big" hidden>
+      It's your turn — place your cup in the machine.
+    </div>
+    <button id="cancel" class="secondary" style="margin-top:16px">Cancel order</button>
+  </div>
+
+  <h2>Full queue</h2>
+  <div class="card">
+    <ul id="queue-list" class="order-list"></ul>
+  </div>
+</main>
+
+<script type="module">
+import {
+  ORDERS, MACHINE_STATE, doc, getDoc, updateDoc, onSnapshot, query, where, orderBy,
+  getOrderId, machineOnline, ding, db
+} from "/app.js";
+import { collection } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const myId = getOrderId();
+if (!myId) {
+  document.getElementById("no-order").hidden = false;
+} else {
+  document.getElementById("order-card").hidden = false;
+
+  if ("Notification" in window && Notification.permission === "default") {
+    Notification.requestPermission();
+  }
+
+  let notified = false;
+  let lastStatus = null;
+
+  onSnapshot(doc(db, "orders", myId), (snap) => {
+    const d = snap.data();
+    if (!d) return;
+    document.getElementById("greeting").textContent = "Hey " + d.name + "!";
+    const pill = document.getElementById("status-pill");
+    pill.textContent = d.status.replace("_", " ");
+    pill.className = "status-pill " + d.status;
+    document.getElementById("claim-banner").hidden = d.status !== "awaiting_cup";
+
+    if (d.status === "awaiting_cup" && !notified) {
+      notified = true; ding();
+      if (Notification.permission === "granted") {
+        new Notification("🧋 Your boba is next — place your cup!");
+      }
+    }
+    if (d.status === "done" && lastStatus !== "done") {
+      location.href = "/rate/" + myId;
+    }
+    lastStatus = d.status;
+  });
+
+  document.getElementById("cancel").addEventListener("click", async () => {
+    if (!confirm("Cancel your order?")) return;
+    await updateDoc(doc(db, "orders", myId), { status: "cancelled" });
+    localStorage.removeItem("orderId");
+    location.href = "/";
+  });
+}
+
+const activeQ = query(
+  collection(db, "orders"),
+  where("status", "in", ["queued", "awaiting_cup", "dispensing"]),
+  orderBy("created_at", "asc")
+);
+onSnapshot(activeQ, (snap) => {
+  const list = document.getElementById("queue-list");
+  list.innerHTML = "";
+  let pos = 0;
+  snap.forEach((d) => {
+    pos += 1;
+    const data = d.data();
+    const li = document.createElement("li");
+    const isMe = d.id === myId;
+    li.innerHTML = `<span>${pos}. ${data.name}${isMe ? " (you)" : ""}</span>
+                    <span class="status-pill ${data.status}">${data.status.replace("_"," ")}</span>`;
+    if (isMe) {
+      document.getElementById("position").textContent = "#" + pos;
+      const ahead = pos - 1;
+      document.getElementById("eta").textContent =
+        ahead === 0 ? "up next" : `~${ahead * 1} min wait (${ahead} ahead)`;
+    }
+    list.appendChild(li);
+  });
+  if (list.children.length === 0) {
+    list.innerHTML = "<li>No active orders.</li>";
+  }
+});
+
+onSnapshot(MACHINE_STATE, (snap) => {
+  document.getElementById("offline").hidden = machineOnline(snap.data());
+});
+</script>
+</body>
+</html>

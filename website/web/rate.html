@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BobaBot — Rate</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<main>
+  <h1>How was it?</h1>
+  <p class="subtitle">Your rating trains the recipe.</p>
+
+  <div class="card">
+    <div class="stars" id="stars">
+      <button data-v="1">★</button><button data-v="2">★</button>
+      <button data-v="3">★</button><button data-v="4">★</button>
+      <button data-v="5">★</button>
+    </div>
+    <button id="submit" disabled>Submit rating</button>
+    <p id="thanks" class="subtitle" style="text-align:center;margin-top:12px" hidden>
+      Thanks! <a href="/">Order again</a>
+    </p>
+  </div>
+</main>
+
+<script type="module">
+import { doc, updateDoc, db } from "/app.js";
+
+const id = location.pathname.split("/").pop();
+let chosen = 0;
+const btns = document.querySelectorAll("#stars button");
+btns.forEach(b => b.addEventListener("click", () => {
+  chosen = Number(b.dataset.v);
+  btns.forEach(x => x.classList.toggle("active", Number(x.dataset.v) <= chosen));
+  document.getElementById("submit").disabled = false;
+}));
+
+document.getElementById("submit").addEventListener("click", async () => {
+  if (!chosen) return;
+  const btn = document.getElementById("submit");
+  btn.disabled = true; btn.textContent = "Saving…";
+  try {
+    await updateDoc(doc(db, "orders", id), { rating: chosen });
+    document.getElementById("thanks").hidden = false;
+    btn.hidden = true;
+    localStorage.removeItem("orderId");
+  } catch (e) {
+    alert(e.message); btn.disabled = false; btn.textContent = "Submit rating";
+  }
+});
+</script>
+</body>
+</html>
