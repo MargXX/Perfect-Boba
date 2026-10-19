@@ -7,6 +7,9 @@ cd "$(dirname "$0")"
 if [ $# -eq 0 ]; then
   .venv/bin/mpremote repl
 else
+  # Hard-reset first: if a previous run was interrupted, the board can be left
+  # hung and refuse to connect ("could not enter raw repl").
+  .venv/bin/python tools/hard_reset.py
   # mount . makes local files (servo.py etc.) importable without uploading
   .venv/bin/mpremote mount . run "$1"
 fi

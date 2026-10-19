@@ -38,6 +38,8 @@ b.press()
 b.angle(70)    # move and hold, for tuning
 ```
 
+**Ground jumper (ESP32 GND → Uno GND):** connect it only when the boards are *not* both plugged into the Mac. If both are on the Mac's USB, they already share ground through it, and the extra jumper makes a ground loop that carries servo current through the ESP32 and crashes it. Standalone (wall power, no Mac) the jumper is required.
+
 Test it with `./run.sh button_test.py`. To find which pin a servo is on, use `./run.sh pin_finder.py`.
 
 ## Servos driven directly by the ESP32 (MG995 / MG996R)

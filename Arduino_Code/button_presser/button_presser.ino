@@ -10,6 +10,7 @@
 //   ESP32 GPIO 18 -> Arduino pin 2      ESP32 GND -> Arduino GND
 //   Servo 1 orange -> Arduino pin 9     Servo 2 orange -> Arduino pin 10
 //   Both servos red / brown -> Arduino 5V / GND
+//   Skip the GND jumper when both boards are on the Mac's USB (ground loop); use it otherwise.
 
 #include <Servo.h>
 #include <SoftwareSerial.h>

@@ -22,4 +22,6 @@ To try commands by hand, run `./monitor.sh` and type `PRESS 1`, `PRESS 2`, `ANGL
 | Both servos red | Uno 5V |
 | Both servos brown | Uno GND |
 
+**Ground jumper (ESP32 GND → Uno GND):** connect it only when the boards are *not* both plugged into the Mac. If both are on the Mac's USB, they already share ground through it, and the extra jumper makes a ground loop that carries servo current through the ESP32 and crashes it. Standalone (wall power, no Mac) the jumper is required.
+
 Tune `PRESS_ANGLE` and `REST_ANGLE` (one value per servo) at the top of `button_presser.ino`.
