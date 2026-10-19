@@ -13,5 +13,7 @@ if [ $# -ne 1 ]; then
 fi
 
 .venv/bin/python tools/hard_reset.py
-$MP cp button.py :button.py + cp pumps.py :pumps.py + cp servo.py :servo.py + cp "$1" :main.py + reset
+EXTRA=""
+[ -f wifi_config.py ] && EXTRA="cp wifi_config.py :wifi_config.py +"
+$MP cp button.py :button.py + cp pumps.py :pumps.py + cp servo.py :servo.py + $EXTRA cp "$1" :main.py + reset
 echo "Installed $1 as main.py. It now runs whenever the ESP32 powers on."

@@ -208,3 +208,6 @@ __marimo__/
 
 # ESP32 MicroPython firmware downloads
 ESP32_Code/firmware/
+
+# ESP32 WiFi settings (copy from wifi_config_example.py)
+ESP32_Code/wifi_config.py

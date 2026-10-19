@@ -1,13 +1,14 @@
 # ESP32 code (MicroPython)
 
-The board runs MicroPython. `main.py` runs automatically on boot.
+The ESP32 is the machine's brain. It decides when each pump runs and tells the Arduino Uno (`../Arduino_Code`) to press the pumps' toggle buttons with servos. `main.py` runs automatically on boot.
 
 ## One-time setup
 
-The tools are in `.venv/`. To recreate the venv on another machine:
+The tools (`esptool`, `mpremote`, editor stubs) are in `.venv/`. To recreate the venv on another machine:
 
 ```sh
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+cp wifi_config_example.py wifi_config.py   # then edit the network name/password
 ```
 
 Plug in the ESP32 over USB, then flash MicroPython:
@@ -17,52 +18,91 @@ Plug in the ESP32 over USB, then flash MicroPython:
 ./flash.sh esp32s3    # ESP32-S3 boards
 ```
 
-If the port isn't found, hold the **BOOT** button while it connects. You can also pass the port yourself: `./flash.sh esp32 /dev/cu.usbserial-0001`.
+If it can't connect, hold the **BOOT** button while it connects.
 
 ## Day-to-day
 
 | Command | What it does |
 |---|---|
-| `./run.sh servo_test.py` | Runs a script on the board without saving it |
-| `./upload.sh` | Copies all `.py` files to the board and resets it |
+| `./run.sh pump_server.py` | Runs a script on the board without saving it (Ctrl-C to stop) |
 | `./run.sh` | Opens the interactive REPL (Ctrl-] to exit) |
+| `./install_main.sh pump_server.py` | Saves a script as the board's `main.py`, so it runs on its own at power-up |
+| `./upload.sh` | Copies every `.py` file to the board and resets it |
 
-## Button-pressing servo (via the Arduino)
+`run.sh` hard-resets the board first, so a run that was interrupted can't leave it stuck. All the scripts connect to the ESP32's port explicitly (`tools/esp32_port.sh`). Otherwise mpremote can pick the Uno instead when both are plugged in.
 
-The button servo is driven by the Arduino Uno (`../Arduino_Code`). The ESP32 sends it commands over one wire: GPIO 18 to Uno pin 2, plus a shared GND. This keeps the servo's power surges away from the ESP32, which otherwise boot-loops.
+## Phone control over WiFi (`pump_server.py`)
+
+The ESP32 creates its own WiFi network. No school or home WiFi is needed.
+
+1. Make sure both pumps are **off**. The buttons are toggles, so the program assumes they start off.
+2. Run `./run.sh pump_server.py`, or `./install_main.sh pump_server.py` to run it from the wall without the Mac.
+3. On your phone, join the network set in `wifi_config.py` (default `BobaBot`). Stay connected even if the phone says there's no internet.
+4. Open **http://192.168.4.1**.
+
+Each pump has **Run** (for a number of seconds, up to 120) and **Stop**, and both can run at once. The page updates every second. If a pump gets out of step (for example, someone pressed its button by hand), use "Out of sync? It's actually on / off" to correct it without pressing the button. The onboard LED (GPIO 2) is lit while any pump is on.
+
+The ESP32 only supports 2.4 GHz WPA2 WiFi with a plain password. It can't join networks like "Brown" that use a username and password (enterprise WiFi).
+
+## Pumps in code
 
 ```python
 from button import ButtonPresser
-b = ButtonPresser()
-b.press()
-b.angle(70)    # move and hold, for tuning
+from pumps import Pump, run_together
+
+presser = ButtonPresser()
+pump1 = Pump(presser, servo=1)
+pump2 = Pump(presser, servo=2)
+
+pump1.run(10)                        # on for 10 s, then off
+pump2.on(); pump2.off()
+run_together({pump1: 10, pump2: 5})  # both at once, each with its own time
 ```
 
-**Ground jumper (ESP32 GND → Uno GND):** connect it only when the boards are *not* both plugged into the Mac. If both are on the Mac's USB, they already share ground through it, and the extra jumper makes a ground loop that carries servo current through the ESP32 and crashes it. Standalone (wall power, no Mac) the jumper is required.
+- `button.py` sends `PRESS` commands to the Uno over UART (GPIO 18 → Uno pin 2). Each press is sent 3 times with an id and checksum. The Uno acts on the first good copy, so a garbled command can't cause an extra toggle.
+- `pumps.py` tracks whether each pump is on and waits 1.3 s after each press so commands never overlap.
 
-Test it with `./run.sh button_test.py`. To find which pin a servo is on, use `./run.sh pin_finder.py`.
+## Tests
 
-## Servos driven directly by the ESP32 (MG995 / MG996R)
+| Script | What it does |
+|---|---|
+| `pump_test.py` | Pump 1 for 10 s, pump 2 for 10 s, then both together |
+| `pump_loop_test.py` | Runs forever: one pump for 5 s every 20 s, alternating, with the LED on while pumping. Good for long reliability checks. |
+| `button_test.py` | Presses servo 1 three times |
+| `pin_finder.py` | Sweeps a servo on each GPIO in turn, to find which pin it's on |
+| `servo_test.py` | Drives a servo directly from the ESP32 (no Uno) |
+
+## Wiring
+
+| From | To |
+|---|---|
+| ESP32 GPIO 18 (through a 1 kΩ resistor) | Uno pin 2 |
+| ESP32 GND | Uno GND, **only when the boards aren't both on the same USB source** (see below) |
+
+The servos are wired to and powered by the Uno. See `../Arduino_Code/README.md`.
+
+**Ground jumper rule:** if both boards are plugged into the Mac, or into the same multi-port USB charger, they already share ground through it. Adding the jumper then makes a ground loop. Servo current flows through the ESP32 and crashes it (`Guru Meditation Error … IllegalInstruction`). Leave the jumper off in that case. If the boards are on separate power sources, the jumper is required, or the commands won't get through.
+
+## Troubleshooting
+
+| Symptom | Cause / fix |
+|---|---|
+| `could not enter raw repl` with a `b'\x00\x00…'` dump | mpremote talked to the Uno instead of the ESP32. The scripts handle this. By hand, use `mpremote connect /dev/cu.usbserial-0001 …` |
+| `Guru Meditation Error … IllegalInstruction` when a servo moves | Ground loop. Remove the ESP32 ↔ Uno GND jumper when both boards share a USB source |
+| Boot loop with `flash read err` | Something is on GPIO 6–11 or 12, or a servo is powered from the ESP32's 5V pin. Unplug it |
+| A pump is on when the page says off (or the reverse) | A press was lost, or the button was pressed by hand. Use "Out of sync?" on the page |
+| `PWM is inactive` | MicroPython 1.29 bug with `duty_ns=` in the `PWM()` constructor. `servo.py` works around it |
+
+## Servos driven directly by the ESP32
+
+`servo.py` can also drive an MG995/MG996R straight from an ESP32 pin, but the current setup uses the Uno instead. The servo's power surges made this ESP32 reset.
 
 ```python
 from servo import Servo, ContinuousServo
-
-arm = Servo(18)          # standard 180° servo
+arm = Servo(18)
 arm.angle(90)
 arm.sweep(0, 180, seconds=2)
-arm.release()            # go limp
-
-spin = ContinuousServo(19)   # only for the 360° continuous-rotation version
-spin.speed(0.5)
-spin.stop()
+arm.release()
 ```
 
-### Wiring
-
-| Servo wire | Connect to |
-|---|---|
-| Brown | GND, shared by the servo supply **and** the ESP32 |
-| Red | **External 5–6 V supply** (never the ESP32's 3.3 V or 5 V pin) |
-| Orange | ESP32 GPIO (e.g. 18, 19, 21, 22, 23, 25, 26, 27, 32, 33) |
-
-Each MG995/MG996R can pull 2–2.5 A when it stalls, so budget about 2.5 A per servo on the supply. Put a large capacitor (470–1000 µF) across the servo supply. Avoid GPIO 34–39 (input only) and 6–11 (flash). GPIO 4, 5, 13, 14, 16 and 17 are already used by `main.py`.
+Power the servo from a separate 5–6 V supply, never the ESP32's pins, and connect that supply's ground to the ESP32's GND. Avoid GPIO 34–39 (input only) and 6–11 (flash).
