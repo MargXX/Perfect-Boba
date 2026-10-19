@@ -6,7 +6,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 CHIP="${1:-esp32}"
-PORT="${2:-}"
+PORT="${2:-$(tools/esp32_port.sh)}"
 VERSION="20260824-v1.29.0"
 
 case "$CHIP" in

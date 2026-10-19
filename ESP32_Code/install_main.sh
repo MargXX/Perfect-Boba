@@ -5,6 +5,7 @@
 # Put the real machine code back afterwards with: ./upload.sh
 set -euo pipefail
 cd "$(dirname "$0")"
+MP=".venv/bin/mpremote connect $(tools/esp32_port.sh)"
 
 if [ $# -ne 1 ]; then
   echo "Usage: ./install_main.sh <script.py>"
@@ -12,5 +13,5 @@ if [ $# -ne 1 ]; then
 fi
 
 .venv/bin/python tools/hard_reset.py
-.venv/bin/mpremote cp button.py :button.py + cp pumps.py :pumps.py + cp servo.py :servo.py + cp "$1" :main.py + reset
+$MP cp button.py :button.py + cp pumps.py :pumps.py + cp servo.py :servo.py + cp "$1" :main.py + reset
 echo "Installed $1 as main.py. It now runs whenever the ESP32 powers on."

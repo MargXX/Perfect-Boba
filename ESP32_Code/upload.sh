@@ -3,8 +3,9 @@
 # main.py runs automatically on boot.
 set -euo pipefail
 cd "$(dirname "$0")"
+MP=".venv/bin/mpremote connect $(tools/esp32_port.sh)"
 
 for f in *.py; do
-  .venv/bin/mpremote cp "$f" ":$f"
+  $MP cp "$f" ":$f"
 done
-.venv/bin/mpremote reset
+$MP reset
