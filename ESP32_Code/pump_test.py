@@ -1,21 +1,21 @@
 """
-Turns the pump on for 10 seconds, then off.
-The pump's button is a toggle (one press = on, next press = off),
-so this assumes the pump is OFF when you start.
-
+Pump test. Both pumps must be OFF when you start.
 Run:  ./run.sh pump_test.py
 """
 from button import ButtonPresser
-import time
+from pumps import Pump, run_together
 
-PUMP_SECONDS = 10
+presser = ButtonPresser()
+pump1 = Pump(presser, servo=1)
+pump2 = Pump(presser, servo=2)
 
-b = ButtonPresser()
+print("pump 1 for 10 s")
+pump1.run(10)
 
-print("pump ON")
-b.press()
-time.sleep(PUMP_SECONDS)
+print("pump 2 for 10 s")
+pump2.run(10)
 
-print("pump OFF")
-b.press()
+print("both together: pump 1 for 10 s, pump 2 for 5 s")
+run_together({pump1: 10, pump2: 5})
+
 print("done")
