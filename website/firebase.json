@@ -13,7 +13,8 @@
       { "source": "/queue", "destination": "/queue.html" },
       { "source": "/rate/**", "destination": "/rate.html" },
       { "source": "/admin", "destination": "/admin.html" },
-      { "source": "/dev", "destination": "/dev.html" }
+      { "source": "/dev", "destination": "/dev.html" },
+      { "source": "/leaderboard", "destination": "/leaderboard.html" }
     ]
   },
   "firestore": {

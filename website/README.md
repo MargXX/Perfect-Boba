@@ -4,9 +4,10 @@ The ordering + rating web app for Perfect Boba. Built on Firebase (Hosting + Fir
 
 ## What it does
 
-- `/` — guests scan a QR on the machine, enter a name, how many liquid oz they want (8/12/16/20) and tapioca on/off, then either tap **🤖 Order now** (the model picks the creamer:tea mix) or **I'm picky** (set the mix yourself). Shows the total order count.
+- `/` — guests scan a QR on the machine, enter a name, how many liquid oz they want (8/12/16/20) and tapioca on/off, then either tap **🤖 Order now** (the model picks the creamer:tea mix) or **I'm picky** (set the mix yourself). Shows the total order count, and for returning guests "You've had N cups · #K on the leaderboard".
 - `/queue` — live queue position, status pill, browser push + audio ding when it's your turn, auto-redirects to rate when done
 - `/rate/:id` — 1–5 stars after drinking, plus an optional "More tea / Perfect / More creamer"; trains the recipe model
+- `/leaderboard` — cups made per person (only orders that reached `done` count, so spamming orders doesn't help). People are grouped by their phone ID and shown under their latest name; no login needed.
 - `/admin` — read-only operator dashboard with active queue + recent completed orders
 - `/dev` — passcode-locked tools: pause/resume, hot-water clean, mark orders done, cancel, clear the queue, delete orders, model status
 
@@ -62,6 +63,7 @@ website/
 │   ├── rate.html               # 1–5 stars + "more tea / perfect / more creamer"
 │   ├── admin.html              # operator view
 │   ├── dev.html                # passcode-locked dev tools
+│   ├── leaderboard.html        # cups made per person
 │   ├── app.js                  # shared Firebase init + helpers
 │   ├── ml.js                   # recipe model (no Firebase; runs in browser and Node)
 │   └── style.css

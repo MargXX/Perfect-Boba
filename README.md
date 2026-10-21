@@ -12,7 +12,7 @@ Phone ──WiFi──▶ ESP32 (MicroPython) ──1 wire, UART──▶ Arduin
 
 - **ESP32** (`ESP32_Code/`): decides when each pump runs. It currently creates its own WiFi network with a phone control page for running each pump for a set time.
 - **Arduino Uno** (`Arduino_Code/`): drives the servos that physically press the pumps' toggle buttons, on command from the ESP32. Keeping the servos on the Uno keeps their power surges away from the ESP32.
-- **Website** (`website/`): Firebase app for ordering, live queue, ratings, an admin view and passcode-locked dev tools (`/dev`). Guests pick a size in liquid oz, then either let the model pick their creamer:tea mix (**Order now**) or set it themselves (**I'm picky**). After drinking they rate 1–5 stars and can say "more tea / perfect / more creamer".
+- **Website** (`website/`): Firebase app for ordering, live queue, ratings, an admin view and passcode-locked dev tools (`/dev`). Guests pick a size in liquid oz, then either let the model pick their creamer:tea mix (**Order now**) or set it themselves (**I'm picky**). After drinking they rate 1–5 stars and can say "more tea / perfect / more creamer". A leaderboard counts each person's cups.
 - **Model** (`website/web/ml.js`): learns a group taste plus each person's own taste from every rating, using gradient descent. Runs in the browser, no server.
 
 ## Status

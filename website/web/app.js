@@ -92,6 +92,24 @@ export async function loadModel() {
   return learn(snap.docs.map((d) => d.data()));
 }
 
+// Cups actually made (status done), per phone. Ordering alone doesn't count,
+// so nobody can climb the leaderboard by spamming orders. Each person shows
+// under the name from their latest order.
+export async function loadCupCounts() {
+  const snap = await getDocs(query(ORDERS, where("status", "==", "done")));
+  const people = new Map();
+  snap.forEach((d) => {
+    const o = d.data();
+    if (!o.drinker_id) return;
+    const t = o.created_at?.toMillis?.() ?? 0;
+    const p = people.get(o.drinker_id) || { id: o.drinker_id, cups: 0, name: o.name, latest: 0 };
+    p.cups += 1;
+    if (t >= p.latest) { p.latest = t; p.name = o.name; }
+    people.set(o.drinker_id, p);
+  });
+  return [...people.values()].sort((a, b) => b.cups - a.cups || a.latest - b.latest);
+}
+
 export async function countOrders() {
   const snap = await getCountFromServer(ORDERS);
   return snap.data().count;

@@ -11,6 +11,7 @@
   <h1>BobaBot</h1>
   <p class="subtitle">Boba that learns from your ratings.</p>
   <p class="order-count" id="order-count">&nbsp;</p>
+  <p class="my-cups" id="my-cups" hidden></p>
 
   <div id="offline" class="machine-offline" hidden>Machine is offline — hang tight.</div>
 
@@ -37,14 +38,15 @@
   </form>
 
   <p class="subtitle" style="text-align:center">
-    Already ordered? <a href="/queue">check your place in line</a>
+    Already ordered? <a href="/queue">check your place in line</a><br>
+    <a href="/leaderboard">🏆 Leaderboard</a>
   </p>
 </main>
 
 <script type="module">
 import {
   ORDERS, MACHINE_STATE, SIZES_OZ, DEFAULT_OZ, ozToMl, addDoc, onSnapshot, serverTimestamp, saveOrderId,
-  machineOnline, loadModel, countOrders, getDrinkerId, getSavedName, saveName
+  machineOnline, loadModel, countOrders, loadCupCounts, getDrinkerId, getSavedName, saveName
 } from "/app.js";
 import { KNOBS, learn, forDrinker, pickRecipe } from "/ml.js";
 
@@ -73,6 +75,17 @@ document.getElementById("picky-toggle").addEventListener("click", () => {
   const panel = document.getElementById("picky");
   panel.hidden = !panel.hidden;
 });
+
+loadCupCounts()
+  .then((people) => {
+    const rank = people.findIndex((p) => p.id === drinkerId);
+    if (rank < 0) return;
+    const me = people[rank];
+    const el = document.getElementById("my-cups");
+    el.textContent = `You've had ${me.cups} ${me.cups === 1 ? "cup" : "cups"} · #${rank + 1} on the leaderboard`;
+    el.hidden = false;
+  })
+  .catch(() => {});
 
 countOrders()
   .then((n) => document.getElementById("order-count").textContent =

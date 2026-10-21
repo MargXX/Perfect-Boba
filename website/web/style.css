@@ -183,3 +183,16 @@ button.small { padding: 6px 10px; font-size: 14px; width: auto; }
 .bool::before { content: "● "; }
 .bool.true { color: #1e7a3c; background: #dcf3e3; }
 .bool.false { color: #b42318; background: #fde4e1; }
+
+.my-cups { margin: -8px 0 12px; color: var(--muted); font-weight: 600; }
+
+.leaderboard { list-style: none; padding: 0; margin: 0; }
+.leaderboard li {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 8px; border-bottom: 1px solid #eee; border-radius: 8px;
+}
+.leaderboard li:last-child { border-bottom: none; }
+.leaderboard li.me { background: #fff1de; }
+.leaderboard .rank { width: 28px; text-align: center; font-weight: 700; font-size: 18px; color: var(--accent-dark); }
+.leaderboard .who { flex: 1; font-weight: 600; overflow-wrap: anywhere; }
+.leaderboard .cups { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }

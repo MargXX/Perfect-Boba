@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BobaBot — Leaderboard</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<main>
+  <h1>🏆 Leaderboard</h1>
+  <p class="subtitle">Cups made so far. Only finished cups count.</p>
+
+  <div class="card">
+    <ol id="board" class="leaderboard"><li>Loading…</li></ol>
+  </div>
+
+  <p class="subtitle" style="text-align:center"><a href="/">Order a cup</a></p>
+</main>
+
+<script type="module">
+import { loadCupCounts, getDrinkerId, escapeHtml } from "/app.js";
+
+const me = localStorage.getItem("drinkerId") && getDrinkerId();
+const medals = ["🥇", "🥈", "🥉"];
+const board = document.getElementById("board");
+
+loadCupCounts().then((people) => {
+  if (!people.length) {
+    board.innerHTML = "<li>No cups made yet. Be the first!</li>";
+    return;
+  }
+  board.innerHTML = people.map((p, i) => `
+    <li class="${p.id === me ? "me" : ""}">
+      <span class="rank">${medals[i] || i + 1}</span>
+      <span class="who">${escapeHtml(p.name)}${p.id === me ? " (you)" : ""}</span>
+      <span class="cups">${p.cups} ${p.cups === 1 ? "cup" : "cups"}</span>
+    </li>`).join("");
+}).catch((err) => {
+  board.innerHTML = `<li>Couldn't load: ${escapeHtml(err.message)}</li>`;
+});
+</script>
+</body>
+</html>
