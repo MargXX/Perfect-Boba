@@ -1,27 +1,59 @@
 // Watch the recipe model learn from pretend friends, no Firebase needed.
-// Each friend has a favorite creamer % near TRUE_FAVORITE and rates their cup
-// 1–5 with some noise. Usage:
-//   node tools/simulate.mjs            # friends like 20% creamer
-//   node tools/simulate.mjs 45 100     # friends like 45%, 100 cups
+// Each friend has their own favorite creamer %, rates a bit high or low, and
+// (if feedback is on) says "more tea / perfect / more creamer". Compares:
+//   group       one best cup for everyone
+//   personal    a correction per person on top of the group curve
+//   +direction  personal, plus the "which way?" answers
+// Usage:
+//   node tools/simulate.mjs            # 8 friends, 80 cups
+//   node tools/simulate.mjs 12 150     # 12 friends, 150 cups
 import { readFileSync } from "node:fs";
 
 // Imported from source so it runs on any Node version.
 const src = readFileSync(new URL("../web/ml.js", import.meta.url), "utf8");
-const { learn, pickRecipe } = await import("data:text/javascript," + encodeURIComponent(src));
+const { learn, forDrinker, pickRecipe } = await import("data:text/javascript," + encodeURIComponent(src));
 
-const TRUE_FAVORITE = Number(process.argv[2] ?? 20);
-const CUPS = Number(process.argv[3] ?? 60);
-const gauss = () => Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(2 * Math.PI * Math.random());
+const FRIENDS = Number(process.argv[2] ?? 8);
+const CUPS = Number(process.argv[3] ?? 80);
+const TRIALS = 5;
 
-const orders = [];
-for (let i = 1; i <= CUPS; i++) {
-  const model = learn(orders);
-  const recipe = pickRecipe(model);
-  const favorite = TRUE_FAVORITE + 6 * gauss();
-  const stars = Math.round(5 - 0.004 * (recipe.creamer - favorite) ** 2 + 0.7 * gauss());
-  orders.push({ recipe, rating: Math.min(5, Math.max(1, stars)) });
-  if (i % 5 === 0) {
-    console.log(`cup ${String(i).padStart(3)}: served ${recipe.creamer}% → ${orders.at(-1).rating}★` +
-      `   model's best guess ${model.best.creamer}% (predicts ${model.predicted}★)`);
+// Seeded so every version sees the same friends and the same order of visits.
+function rng(seed) {
+  return () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+}
+
+function run(options, seed) {
+  const r = rng(seed);
+  const gauss = () => Math.sqrt(-2 * Math.log(1 - r())) * Math.cos(2 * Math.PI * r());
+  const friends = Array.from({ length: FRIENDS }, (_, i) => ({
+    id: `friend-${i}`,
+    favorite: 10 + 45 * r(),   // 10–55% creamer
+    bias: Math.round(gauss()), // rates about a star high or low
+  }));
+  const orders = [];
+  const misses = [];
+  for (let i = 0; i < CUPS; i++) {
+    const f = friends[Math.floor(r() * FRIENDS)];
+    const model = forDrinker(learn(orders, options), f.id);
+    const { creamer } = pickRecipe(model, r);
+    const off = creamer - f.favorite;
+    const stars = Math.round(5 - 0.004 * off ** 2 + f.bias + 0.5 * gauss());
+    const feedback = { creamer: Math.abs(off) < 4 ? 0 : off > 0 ? -1 : 1 };
+    orders.push({ drinker_id: f.id, recipe: { creamer }, rating: Math.min(5, Math.max(1, stars)), feedback });
+    if (i >= CUPS / 2) misses.push(Math.abs(off));
   }
+  return misses.reduce((a, b) => a + b, 0) / misses.length;
+}
+
+const versions = {
+  "group": { personal: false, feedback: false },
+  "personal": { personal: true, feedback: false },
+  "+direction": { personal: true, feedback: true },
+};
+console.log(`${FRIENDS} friends, ${CUPS} cups, ${TRIALS} trials.`);
+console.log("Average distance from each person's favorite over the second half of cups:");
+for (const [name, options] of Object.entries(versions)) {
+  let total = 0;
+  for (let t = 1; t <= TRIALS; t++) total += run(options, t * 7919);
+  console.log(`  ${name.padEnd(11)} ${(total / TRIALS).toFixed(1)}% creamer off`);
 }

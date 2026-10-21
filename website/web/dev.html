@@ -105,7 +105,7 @@ async function refreshStats() {
   try {
     const m = await loadModel();
     $("model-info").textContent = m.n
-      ? `${m.n} ratings → best guess ${JSON.stringify(m.best)}, predicted ${m.predicted}★`
+      ? `${m.n} ratings from ${m.people.size} people → group's best ${JSON.stringify(m.best)}, predicted ${m.predicted}★`
       : `No ratings yet → default ${JSON.stringify(m.best)}`;
     $("count-info").textContent = `${await countOrders()} orders total`;
   } catch (err) {

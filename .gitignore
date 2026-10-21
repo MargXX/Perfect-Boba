@@ -211,3 +211,6 @@ ESP32_Code/firmware/
 
 # ESP32 WiFi settings (copy from wifi_config_example.py)
 ESP32_Code/wifi_config.py
+
+# Account passwords for the website (never commit)
+SECRETS.md

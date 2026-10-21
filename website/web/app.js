@@ -4,7 +4,8 @@ import {
   onSnapshot, query, where, orderBy, limit, serverTimestamp, getCountFromServer
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import {
-  getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
+  initializeAuth, browserLocalPersistence, browserSessionPersistence,
+  signInWithEmailAndPassword, signOut, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { learn } from "/ml.js";
 
@@ -19,7 +20,11 @@ export const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
-export const auth = getAuth(app);
+// Not getAuth(): its IndexedDB storage never finished starting up in Chrome,
+// so the dev page never learned whether you were signed in.
+export const auth = initializeAuth(app, {
+  persistence: [browserLocalPersistence, browserSessionPersistence],
+});
 
 export const ORDERS = collection(db, "orders");
 export const MACHINE_STATE = doc(db, "machine", "state");
@@ -40,6 +45,19 @@ export {
 
 export function saveOrderId(id) { localStorage.setItem("orderId", id); }
 export function getOrderId() { return localStorage.getItem("orderId"); }
+
+// A random ID kept on this phone, so the model can learn your taste without
+// relying on how you type your name.
+export function getDrinkerId() {
+  let id = localStorage.getItem("drinkerId");
+  if (!id) {
+    id = crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now();
+    localStorage.setItem("drinkerId", id);
+  }
+  return id;
+}
+export function getSavedName() { return localStorage.getItem("name") || ""; }
+export function saveName(name) { localStorage.setItem("name", name); }
 
 export function machineOnline(state) {
   const hb = state?.last_heartbeat_ms ?? state?.last_heartbeat;
@@ -70,6 +88,8 @@ export function describeRecipe(o) {
   if (typeof r.creamer === "number") parts.push(`${r.creamer}% creamer`);
   if (r.tapioca) parts.push("🫧");
   if (o.mode) parts.push(o.mode === "ml" ? "🤖" : "picky");
+  const dir = o.feedback?.creamer;
+  if (dir !== undefined) parts.push(["wants more tea", "perfect", "wants more creamer"][dir + 1]);
   return parts.join(" · ");
 }
 

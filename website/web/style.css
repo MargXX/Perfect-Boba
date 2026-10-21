@@ -167,3 +167,5 @@ button.danger { background: var(--danger); }
 button.small { padding: 6px 10px; font-size: 14px; width: auto; }
 .status-pill.cancelled, .status-pill.error { background: #f3c7c7; }
 .label-note { font-weight: 400; color: var(--muted); }
+.segmented.direction { margin-bottom: 16px; }
+.segmented.direction span { font-size: 15px; }

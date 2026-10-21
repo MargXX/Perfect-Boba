@@ -17,6 +17,7 @@
       <button data-v="3">★</button><button data-v="4">★</button>
       <button data-v="5">★</button>
     </div>
+    <div id="directions"></div>
     <button id="submit" disabled>Submit rating</button>
     <p id="thanks" class="subtitle" style="text-align:center;margin-top:12px" hidden>
       Thanks! <a href="/">Order again</a>
@@ -26,9 +27,25 @@
 
 <script type="module">
 import { doc, updateDoc, db } from "/app.js";
+import { KNOBS } from "/ml.js";
 
 const id = location.pathname.split("/").pop();
 let chosen = 0;
+
+// "Which way?" per knob. Optional, but it teaches the model much faster.
+const feedback = {};
+const directions = document.getElementById("directions");
+directions.insertAdjacentHTML("beforeend", `<p class="hint">Next time I'd like…</p>`);
+for (const k of KNOBS) {
+  const row = document.createElement("div");
+  row.className = "segmented direction";
+  for (const [dir, label] of [[-1, k.less], [0, "Perfect"], [1, k.more]]) {
+    row.insertAdjacentHTML("beforeend", `
+      <label><input type="radio" name="dir-${k.key}" value="${dir}"><span>${label}</span></label>`);
+  }
+  row.addEventListener("change", (e) => feedback[k.key] = Number(e.target.value));
+  directions.appendChild(row);
+}
 const btns = document.querySelectorAll("#stars button");
 btns.forEach(b => b.addEventListener("click", () => {
   chosen = Number(b.dataset.v);
@@ -41,7 +58,9 @@ document.getElementById("submit").addEventListener("click", async () => {
   const btn = document.getElementById("submit");
   btn.disabled = true; btn.textContent = "Saving…";
   try {
-    await updateDoc(doc(db, "orders", id), { rating: chosen });
+    const update = { rating: chosen };
+    if (Object.keys(feedback).length) update.feedback = feedback;
+    await updateDoc(doc(db, "orders", id), update);
     document.getElementById("thanks").hidden = false;
     btn.hidden = true;
     localStorage.removeItem("orderId");

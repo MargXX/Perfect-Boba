@@ -44,9 +44,12 @@
 <script type="module">
 import {
   ORDERS, MACHINE_STATE, SIZES_OZ, DEFAULT_OZ, ozToMl, addDoc, onSnapshot, serverTimestamp, saveOrderId,
-  machineOnline, loadModel, countOrders
+  machineOnline, loadModel, countOrders, getDrinkerId, getSavedName, saveName
 } from "/app.js";
-import { KNOBS, learn, pickRecipe } from "/ml.js";
+import { KNOBS, learn, forDrinker, pickRecipe } from "/ml.js";
+
+const drinkerId = getDrinkerId();
+document.getElementById("name").value = getSavedName();
 
 const sizes = document.getElementById("sizes");
 for (const oz of SIZES_OZ) {
@@ -77,10 +80,16 @@ countOrders()
   .catch(() => {});
 
 // Learn from all ratings once on load; fall back to the default recipe.
-const modelReady = loadModel().catch((err) => { console.warn(err); return learn([]); });
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+const modelReady = loadModel()
+  .catch((err) => { console.warn(err); return learn([]); })
+  .then((m) => forDrinker(m, drinkerId));
 modelReady.then((m) => {
-  if (m.n) document.getElementById("ml-hint").textContent =
-    `The robot picks your mix, learned from ${m.n} ${m.n === 1 ? "rating" : "ratings"}.`;
+  const hint = document.getElementById("ml-hint");
+  if (m.nMine) hint.textContent =
+    `Your usual is about ${KNOBS[0].describe(m.best[KNOBS[0].key])}, learned from your ${plural(m.nMine, "rating")}.`;
+  else if (m.n) hint.textContent =
+    `The robot starts from the group's taste (${plural(m.n, "rating")} so far), then learns yours as you rate.`;
 });
 
 onSnapshot(MACHINE_STATE, (snap) => {
@@ -99,13 +108,16 @@ document.getElementById("order-form").addEventListener("submit", async (e) => {
     if (mode === "ml") {
       const m = await modelReady;
       mix = pickRecipe(m);
-      model = { n: m.n, best: m.best, predicted: m.predicted };
+      model = { n: m.n, n_mine: m.nMine, best: m.best, predicted: m.predicted };
     } else {
       mix = Object.fromEntries(KNOBS.map((k) =>
         [k.key, Number(document.getElementById(`knob-${k.key}`).value)]));
     }
+    const name = document.getElementById("name").value.trim() || "Someone";
+    saveName(name);
     const ref = await addDoc(ORDERS, {
-      name: document.getElementById("name").value.trim() || "Someone",
+      name,
+      drinker_id: drinkerId,
       mode,
       size_oz: sizeOz,
       recipe: { ...mix, volume_ml: ozToMl(sizeOz), tapioca: document.getElementById("tapioca").checked },
