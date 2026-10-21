@@ -75,6 +75,8 @@ The ESP32 creates its own WiFi network. No school or home WiFi is needed.
 
 Each pump has **Run** (for a number of seconds, up to 120) and **Stop**, and both can run at once. The page updates every second. If a pump gets out of step (for example, someone pressed its button by hand), use "Out of sync? It's actually on / off" to correct it without pressing the button. The onboard LED (GPIO 2) is lit while any pump is on.
 
+**Clean** flushes hot water through both pumps: put both intake tubes in hot water and a cup under the spout, pick a time (up to 300 s) and tap Clean. Both pumps run for the full time and then turn off; pump 2 starts and stops ~1.3 s after pump 1, because the Uno presses one button at a time to avoid power surges. **Stop both** ends it early.
+
 The ESP32 only supports 2.4 GHz WPA2 WiFi with a plain password. It can't join networks like "Brown" that use a username and password (enterprise WiFi).
 
 ## Libraries (`lib/`)

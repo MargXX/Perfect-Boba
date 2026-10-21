@@ -8,7 +8,7 @@ The ordering + rating web app for Perfect Boba. Built on Firebase (Hosting + Fir
 - `/queue` — live queue position, status pill, browser push + audio ding when it's your turn, auto-redirects to rate when done
 - `/rate/:id` — 1–5 stars after drinking, plus an optional "More tea / Perfect / More creamer"; trains the recipe model
 - `/admin` — read-only operator dashboard with active queue + recent completed orders
-- `/dev` — passcode-locked tools: pause/resume, mark orders done, cancel, clear the queue, delete orders, model status
+- `/dev` — passcode-locked tools: pause/resume, hot-water clean, mark orders done, cancel, clear the queue, delete orders, model status
 
 Guests use their own cellular / dorm wifi. The ESP32 joins a phone hotspot to reach Firestore. No LAN-joining required for guests.
 
@@ -37,6 +37,7 @@ Guests (any internet)  ──→  Firebase Hosting + Firestore
 
 /machine/state
   is_busy, current_order_id, paused, last_heartbeat_ms
+  clean: { seconds, status, requested_at, reason? }   # hot-water clean requested from /dev
 ```
 
 ### Security
@@ -92,8 +93,17 @@ Tools: Node (`brew install node`) and the Firebase CLI (`npm install -g firebase
 
 - **Deploy changes**: from `website/`, `firebase deploy --only hosting` for page changes, or `--only firestore,hosting` when `firestore.rules` changed too.
 - **Clear the queue**: `/dev` → passcode → **Clear queue (cancel all)**.
+- **Clean the machine**: put both intake tubes in hot water and a cup under the spout, then `/dev` → **Clean machine** → seconds → **Clean**. Until the ESP32 takes orders from the website, use **Clean** on the ESP32's phone page instead (`ESP32_Code/apps/pump_server.py`).
 - **Test without the machine**: place an order, mark it **Done** on `/dev`, then rate it from the page you ordered on.
 - **Start the model over** (e.g. after testing): `/dev` → **Delete ALL orders and ratings**.
+
+## What the ESP32 must do for cleaning
+
+The dev page only writes a request; the ESP32 carries it out. When it sees `/machine/state.clean.status == "requested"`:
+
+- If `requested_at` is more than 60 s old, ignore it (the dev page shows it as expired), so a clean sent while the machine was offline never starts by surprise.
+- If it's in the middle of an order, set `status: "skipped"`, `reason: "busy"`.
+- Otherwise set `status: "running"` and `is_busy: true`, run both pumps for `seconds` (`run_together` in `ESP32_Code/lib/pumps.py`), then set `status: "done"` and `is_busy: false`. Don't start orders while cleaning.
 
 ## How the recipe learns
 

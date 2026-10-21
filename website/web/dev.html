@@ -20,8 +20,20 @@
   <div id="tools" hidden>
     <div class="card">
       <h2 style="margin-top:0">Machine</h2>
-      <p id="machine-info">—</p>
+      <div id="machine-info" class="status-list"></div>
       <button id="pause" class="secondary">Pause queue</button>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0">Clean machine</h2>
+      <p class="hint" style="text-align:left">Put both intake tubes in hot water and a cup under the spout.
+        Runs both pumps for this long, then turns them off.</p>
+      <div class="slider-row">
+        <input id="clean-seconds" type="number" min="5" max="300" step="5" value="30"
+               inputmode="numeric" style="width:90px"> seconds
+        <button id="clean" style="flex:1">Clean</button>
+      </div>
+      <p id="clean-info" class="hint" style="text-align:left"></p>
     </div>
 
     <div class="card">
@@ -53,9 +65,9 @@
 
 <script type="module">
 import {
-  auth, db, ORDERS, MACHINE_STATE, ACTIVE_STATUSES, DEV_EMAIL, doc, getDocs, setDoc, updateDoc,
+  auth, db, ORDERS, MACHINE_STATE, ACTIVE_STATUSES, DEV_EMAIL, doc, getDocs, setDoc, updateDoc, serverTimestamp,
   deleteDoc, writeBatch, onSnapshot, query, where, orderBy, limit, signInWithEmailAndPassword,
-  signOut, onAuthStateChanged, machineOnline, loadModel, countOrders, escapeHtml, describeRecipe
+  signOut, onAuthStateChanged, machineOnline, loadModel, countOrders, escapeHtml, describeRecipe, renderMachineStatus
 } from "/app.js";
 
 const $ = (id) => document.getElementById(id);
@@ -137,11 +149,11 @@ function start() {
 
   unsubs.push(onSnapshot(MACHINE_STATE, (snap) => {
     const d = snap.data() || {};
-    $("machine-info").textContent =
-      `${machineOnline(d) ? "online" : "offline"} · busy=${d.is_busy ?? "?"} · ` +
-      `paused=${d.paused ?? false} · current=${d.current_order_id || "—"}`;
+    renderMachineStatus($("machine-info"), d);
     $("pause").textContent = d.paused ? "Resume queue" : "Pause queue";
     $("pause").onclick = () => setDoc(MACHINE_STATE, { paused: !d.paused }, { merge: true });
+    lastState = d;
+    showClean();
   }));
 
   const activeQ = query(ORDERS, where("status", "in", ACTIVE_STATUSES), orderBy("created_at", "asc"));
@@ -163,6 +175,39 @@ function start() {
     if (snap.empty) list.innerHTML = "<li>No orders yet</li>";
   }));
 }
+
+// Cleaning is a request the ESP32 picks up from /machine/state.clean.
+// It ignores requests more than a minute old, so a clean sent while it was
+// offline never starts by surprise later.
+const CLEAN_EXPIRES_MS = 60_000;
+let lastState = {};
+// Re-draw so heartbeat age, online status and unanswered cleans stay current.
+setInterval(() => { renderMachineStatus($("machine-info"), lastState); showClean(); }, 5000);
+
+function showClean() {
+  const c = lastState.clean;
+  const sentAt = c?.requested_at?.toMillis?.();
+  const waiting = c?.status === "requested" && !(sentAt && Date.now() - sentAt > CLEAN_EXPIRES_MS);
+  const info = !machineOnline(lastState) ? "Machine is offline, so a clean won't run until it's connected to the website."
+    : !c ? ""
+    : c.status === "requested" ? (waiting ? `Sent (${c.seconds} s). Waiting for the machine…`
+                                          : "The machine didn't pick up the last request. Try again.")
+    : c.status === "running" ? `Cleaning: both pumps on for ${c.seconds} s…`
+    : c.status === "done" ? `Last clean finished (${c.seconds} s).`
+    : c.status === "skipped" ? `Machine skipped the clean: ${c.reason || "busy"}.`
+    : "";
+  $("clean-info").textContent = info;
+  $("clean").disabled = waiting || c?.status === "running";
+}
+
+$("clean").addEventListener("click", async () => {
+  const seconds = Number($("clean-seconds").value);
+  if (!(seconds >= 1 && seconds <= 300)) return alert("Pick 1–300 seconds.");
+  if (!confirm(`Both intake tubes in hot water and a cup under the spout?\nPumps will run for ${seconds} s.`)) return;
+  await setDoc(MACHINE_STATE, {
+    clean: { seconds, status: "requested", requested_at: serverTimestamp() },
+  }, { merge: true });
+});
 
 $("clear-queue").addEventListener("click", async () => {
   if (!confirm("Cancel every queued and in-progress order?")) return;

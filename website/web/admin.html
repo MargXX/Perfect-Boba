@@ -14,7 +14,7 @@
 
   <div class="card">
     <h2 style="margin-top:0">Machine</h2>
-    <p id="machine-info">—</p>
+    <div id="machine-info" class="status-list"></div>
     <p class="hint">Pause, clear the queue and more on the <a href="/dev">dev page</a>.</p>
   </div>
 
@@ -32,7 +32,7 @@
 <script type="module">
 import {
   MACHINE_STATE, ORDERS, onSnapshot, query, where, orderBy, limit, machineOnline, countOrders,
-  escapeHtml, describeRecipe
+  escapeHtml, describeRecipe, renderMachineStatus
 } from "/app.js";
 
 const showCount = () => countOrders()
@@ -40,12 +40,13 @@ const showCount = () => countOrders()
   .catch(() => {});
 showCount();
 
+let machine = {};
+setInterval(() => renderMachineStatus(document.getElementById("machine-info"), machine), 5000);
 onSnapshot(MACHINE_STATE, (snap) => {
-  const d = snap.data() || {};
+  const d = machine = snap.data() || {};
   const online = machineOnline(d);
   document.getElementById("offline").hidden = online;
-  document.getElementById("machine-info").textContent =
-    `busy=${d.is_busy ?? "?"} paused=${d.paused ?? false} current=${d.current_order_id ?? "—"}`;
+  renderMachineStatus(document.getElementById("machine-info"), d);
 });
 
 const active = query(

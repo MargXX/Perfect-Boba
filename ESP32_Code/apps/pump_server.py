@@ -3,7 +3,8 @@ Phone control for the pumps over WiFi.
 
 The ESP32 creates its own WiFi network (name and password in wifi_config.py).
 Join it from your phone, open http://192.168.4.1, and run either pump for a
-set number of seconds. The onboard LED (GPIO 2) is lit while any pump is on.
+set number of seconds, or run both to flush hot water through them (Clean).
+The onboard LED (GPIO 2) is lit while any pump is on.
 
 Both pumps must be OFF when it starts (the buttons are toggles).
 
@@ -22,6 +23,7 @@ from wifi_config import AP_SSID, AP_PASSWORD
 
 NUM_PUMPS = 2
 MAX_SECONDS = 120
+CLEAN_MAX_SECONDS = 300
 STARTUP_SECONDS = 3  # when everything powers on together, give the Uno time to boot
 
 led = Pin(2, Pin.OUT, value=0)
@@ -59,6 +61,18 @@ async def stop(pump):
     pump.stop_at = None
     await set_on(pump, False)
     pump.stop_at = None  # in case a run_for() finished while we waited
+
+
+async def clean(seconds):
+    # Both pumps run for the full time. The Uno presses one button at a time,
+    # so pump 2 starts (and stops) ~1.3 s after pump 1.
+    for p in pumps:
+        await run_for(p, seconds)
+
+
+async def stop_all():
+    for p in pumps:
+        await stop(p)
 
 
 async def timer_loop():
@@ -101,6 +115,20 @@ def route(path, params):
     if path == "/":
         return "200 OK", "text/html; charset=utf-8", PAGE
     if path == "/api/status":
+        return "200 OK", "application/json", json.dumps(status())
+
+    if path == "/api/clean":
+        try:
+            seconds = float(params.get("seconds", ""))
+        except ValueError:
+            seconds = 0
+        if not 0 < seconds <= CLEAN_MAX_SECONDS:
+            return "400 Bad Request", "application/json", \
+                '{"error": "seconds must be between 0 and %d"}' % CLEAN_MAX_SECONDS
+        asyncio.create_task(clean(seconds))
+        return "200 OK", "application/json", json.dumps(status())
+    if path == "/api/stop_all":
+        asyncio.create_task(stop_all())
         return "200 OK", "application/json", json.dumps(status())
 
     if path in ("/api/run", "/api/stop", "/api/fix"):
@@ -216,6 +244,16 @@ button { flex:1; font-size:17px; padding:12px; border-radius:10px; border:0; cur
 </style></head><body>
 <h1>Boba Pumps</h1>
 <div id="pumps"></div>
+<div class="card">
+  <div class="head"><span class="name">Clean</span></div>
+  <p class="fix" style="margin-top:0">Put both intake tubes in hot water and a cup under the spout.
+    Runs both pumps, then turns them off.</p>
+  <div class="row">
+    <input id="clean-t" type="number" inputmode="decimal" min="1" max="300" step="1" value="30"> s
+    <button class="go" onclick="clean()">Clean</button>
+    <button class="stop" onclick="api('/api/stop_all')">Stop both</button>
+  </div>
+</div>
 <div id="msg"></div>
 <script>
 const N = 2;
@@ -249,6 +287,10 @@ async function api(url) {
     const st = await r.json();
     if (st.error) msg.textContent = st.error; else show(st);
   } catch (e) { msg.textContent = "Can't reach the machine. Still on the BobaBot WiFi?"; }
+}
+function clean() {
+  if (!confirm("Both intake tubes in hot water and a cup under the spout?")) return;
+  api(`/api/clean?seconds=${document.getElementById("clean-t").value}`);
 }
 function run(i) { api(`/api/run?pump=${i}&seconds=${document.getElementById("t" + i).value}`); }
 api("/api/status");

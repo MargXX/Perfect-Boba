@@ -65,6 +65,27 @@ export function machineOnline(state) {
   return Date.now() - (hb.toMillis ? hb.toMillis() : hb) < 30_000;
 }
 
+// Machine status as label/value rows. Yes/no values are green for true and
+// red for false, with the word shown too.
+export function renderMachineStatus(el, state) {
+  const d = state || {};
+  const hb = d.last_heartbeat_ms;
+  const ago = hb ? Math.round((Date.now() - hb) / 1000) : null;
+  const rows = [
+    ["Online", machineOnline(d)],
+    ["Busy", d.is_busy ?? null],
+    ["Paused", d.paused ?? false],
+    ["Current order", d.current_order_id || "—"],
+    ["Last heartbeat", ago === null ? "never" : ago < 120 ? `${ago} s ago` : `${Math.round(ago / 60)} min ago`],
+  ];
+  el.innerHTML = rows.map(([label, v]) => {
+    const value = typeof v === "boolean"
+      ? `<span class="bool ${v}">${v}</span>`
+      : `<span>${escapeHtml(v ?? "unknown")}</span>`;
+    return `<div class="status-row"><span class="status-label">${label}</span>${value}</div>`;
+  }).join("");
+}
+
 // Fit the recipe model to every rated order.
 export async function loadModel() {
   const snap = await getDocs(query(ORDERS, where("rating", ">=", 1)));

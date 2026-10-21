@@ -37,11 +37,11 @@ h2 { margin: 24px 0 8px; font-size: 20px; }
 }
 
 label { display: block; font-weight: 600; margin: 12px 0 4px; }
-input[type="text"], input[type="range"] {
+input[type="text"], input[type="password"], input[type="number"], input[type="range"] {
   width: 100%;
   font-size: 16px;
 }
-input[type="text"] {
+input[type="text"], input[type="password"], input[type="number"] {
   padding: 10px;
   border: 1px solid #ddd;
   border-radius: 8px;
@@ -169,3 +169,17 @@ button.small { padding: 6px 10px; font-size: 14px; width: auto; }
 .label-note { font-weight: 400; color: var(--muted); }
 .segmented.direction { margin-bottom: 16px; }
 .segmented.direction span { font-size: 15px; }
+
+.status-list { margin: 4px 0 12px; }
+.status-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 0; border-bottom: 1px solid #eee;
+}
+.status-row:last-child { border-bottom: none; }
+.status-label { color: var(--muted); }
+.bool {
+  font-weight: 600; font-size: 14px; padding: 2px 10px; border-radius: 999px;
+}
+.bool::before { content: "● "; }
+.bool.true { color: #1e7a3c; background: #dcf3e3; }
+.bool.false { color: #b42318; background: #fde4e1; }
