@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BobaBot — Dev</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<main>
+  <h1>Dev</h1>
+
+  <form id="login" class="card" hidden>
+    <label for="passcode">Passcode</label>
+    <input id="passcode" type="password" autocomplete="current-password" required>
+    <button type="submit" style="margin-top:12px">Unlock</button>
+    <p id="login-error" class="hint error" hidden></p>
+  </form>
+
+  <div id="tools" hidden>
+    <div class="card">
+      <h2 style="margin-top:0">Machine</h2>
+      <p id="machine-info">—</p>
+      <button id="pause" class="secondary">Pause queue</button>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0">Model</h2>
+      <p id="model-info">—</p>
+      <p id="count-info" class="hint"></p>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0">Queue</h2>
+      <ul id="active" class="order-list"></ul>
+      <button id="clear-queue" class="danger" style="margin-top:12px">Clear queue (cancel all)</button>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0">Recent orders</h2>
+      <ul id="recent" class="order-list"></ul>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0">Cleanup</h2>
+      <button id="delete-cancelled" class="secondary">Delete cancelled orders</button>
+      <button id="delete-all" class="danger" style="margin-top:8px">Delete ALL orders and ratings</button>
+    </div>
+
+    <button id="logout" class="secondary">Lock</button>
+  </div>
+</main>
+
+<script type="module">
+import {
+  auth, db, ORDERS, MACHINE_STATE, ACTIVE_STATUSES, DEV_EMAIL, doc, getDocs, setDoc, updateDoc,
+  deleteDoc, writeBatch, onSnapshot, query, where, orderBy, limit, signInWithEmailAndPassword,
+  signOut, onAuthStateChanged, machineOnline, loadModel, countOrders, escapeHtml, describeRecipe
+} from "/app.js";
+
+const $ = (id) => document.getElementById(id);
+let unsubs = [];
+
+onAuthStateChanged(auth, async (user) => {
+  unsubs.forEach((u) => u()); unsubs = [];
+  const role = user && (await user.getIdTokenResult()).claims.role;
+  if (user && user.email !== DEV_EMAIL && role !== "dev") {
+    await signOut(auth);
+    return showError("That account isn't a dev account.");
+  }
+  $("login").hidden = !!user;
+  $("tools").hidden = !user;
+  if (user) start();
+});
+
+function showError(msg) {
+  $("login-error").textContent = msg;
+  $("login-error").hidden = false;
+}
+
+$("login").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  $("login-error").hidden = true;
+  try {
+    await signInWithEmailAndPassword(auth, DEV_EMAIL, $("passcode").value);
+    $("passcode").value = "";
+  } catch (err) {
+    showError("Wrong passcode.");
+  }
+});
+
+$("logout").addEventListener("click", () => signOut(auth));
+
+// Run writes in batches (Firestore allows 500 per batch).
+async function eachBatch(docs, apply) {
+  for (let i = 0; i < docs.length; i += 450) {
+    const batch = writeBatch(db);
+    docs.slice(i, i + 450).forEach((d) => apply(batch, d.ref));
+    await batch.commit();
+  }
+  return docs.length;
+}
+
+async function refreshStats() {
+  try {
+    const m = await loadModel();
+    $("model-info").textContent = m.n
+      ? `${m.n} ratings → best guess ${JSON.stringify(m.best)}, predicted ${m.predicted}★`
+      : `No ratings yet → default ${JSON.stringify(m.best)}`;
+    $("count-info").textContent = `${await countOrders()} orders total`;
+  } catch (err) {
+    $("model-info").textContent = "Couldn't load: " + err.message;
+  }
+}
+
+function orderRow(d, buttons) {
+  const x = d.data();
+  const li = document.createElement("li");
+  li.innerHTML = `<span>${escapeHtml(x.name)}<br><small>${escapeHtml(describeRecipe(x))}
+      · <span class="status-pill ${x.status}">${x.status}</span>
+      ${x.rating ? " · " + "★".repeat(x.rating) : ""}</small></span>
+    <span class="row-actions"></span>`;
+  for (const [label, fn] of buttons) {
+    const b = document.createElement("button");
+    b.className = "small secondary"; b.textContent = label;
+    b.addEventListener("click", async () => {
+      b.disabled = true;
+      try { await fn(d.ref); refreshStats(); } catch (err) { alert(err.message); b.disabled = false; }
+    });
+    li.querySelector(".row-actions").appendChild(b);
+  }
+  return li;
+}
+
+function start() {
+  refreshStats();
+
+  unsubs.push(onSnapshot(MACHINE_STATE, (snap) => {
+    const d = snap.data() || {};
+    $("machine-info").textContent =
+      `${machineOnline(d) ? "online" : "offline"} · busy=${d.is_busy ?? "?"} · ` +
+      `paused=${d.paused ?? false} · current=${d.current_order_id || "—"}`;
+    $("pause").textContent = d.paused ? "Resume queue" : "Pause queue";
+    $("pause").onclick = () => setDoc(MACHINE_STATE, { paused: !d.paused }, { merge: true });
+  }));
+
+  const activeQ = query(ORDERS, where("status", "in", ACTIVE_STATUSES), orderBy("created_at", "asc"));
+  unsubs.push(onSnapshot(activeQ, (snap) => {
+    const list = $("active"); list.innerHTML = "";
+    snap.forEach((d) => list.appendChild(orderRow(d, [
+      ["Done", (ref) => updateDoc(ref, { status: "done" })],
+      ["Cancel", (ref) => updateDoc(ref, { status: "cancelled" })],
+    ])));
+    if (snap.empty) list.innerHTML = "<li>Empty</li>";
+  }));
+
+  const recentQ = query(ORDERS, orderBy("created_at", "desc"), limit(20));
+  unsubs.push(onSnapshot(recentQ, (snap) => {
+    const list = $("recent"); list.innerHTML = "";
+    snap.forEach((d) => list.appendChild(orderRow(d, [
+      ["Delete", (ref) => deleteDoc(ref)],
+    ])));
+    if (snap.empty) list.innerHTML = "<li>No orders yet</li>";
+  }));
+}
+
+$("clear-queue").addEventListener("click", async () => {
+  if (!confirm("Cancel every queued and in-progress order?")) return;
+  const snap = await getDocs(query(ORDERS, where("status", "in", ACTIVE_STATUSES)));
+  const n = await eachBatch(snap.docs, (b, ref) => b.update(ref, { status: "cancelled" }));
+  alert(`Cancelled ${n} orders.`);
+});
+
+$("delete-cancelled").addEventListener("click", async () => {
+  if (!confirm("Delete all cancelled orders?")) return;
+  const snap = await getDocs(query(ORDERS, where("status", "==", "cancelled")));
+  alert(`Deleted ${await eachBatch(snap.docs, (b, ref) => b.delete(ref))} orders.`);
+  refreshStats();
+});
+
+$("delete-all").addEventListener("click", async () => {
+  if (prompt('This erases every order and rating (the model starts over). Type DELETE to confirm.') !== "DELETE") return;
+  const snap = await getDocs(ORDERS);
+  alert(`Deleted ${await eachBatch(snap.docs, (b, ref) => b.delete(ref))} orders.`);
+  refreshStats();
+});
+</script>
+</body>
+</html>

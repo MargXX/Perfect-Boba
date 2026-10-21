@@ -12,14 +12,15 @@ Phone ──WiFi──▶ ESP32 (MicroPython) ──1 wire, UART──▶ Arduin
 
 - **ESP32** (`ESP32_Code/`): decides when each pump runs. It currently creates its own WiFi network with a phone control page for running each pump for a set time.
 - **Arduino Uno** (`Arduino_Code/`): drives the servos that physically press the pumps' toggle buttons, on command from the ESP32. Keeping the servos on the Uno keeps their power surges away from the ESP32.
-- **Website** (`website/`): Firebase app for ordering, live queue, ratings and an admin view. Guests order online, and ratings feed `website/tools/optimize.py`, which tunes the default recipe.
+- **Website** (`website/`): Firebase app for ordering, live queue, ratings, an admin view and passcode-locked dev tools. Guests either let the model pick their creamer:tea mix or choose it themselves ("I'm picky"). Every rating retrains the model (`website/web/ml.js`).
 
 ## Status
 
 - [x] ESP32 + Uno servo control of two toggle pumps, running reliably on wall power
-- [x] Phone control page over the ESP32's own WiFi (`ESP32_Code/pump_server.py`)
+- [x] Phone control page over the ESP32's own WiFi (`ESP32_Code/apps/pump_server.py`)
 - [ ] ESP32 picks up orders from Firestore and dispenses them (needs internet WiFi, e.g. a phone hotspot)
-- [ ] Map recipe sliders (tea / sweetness / milk / tapioca) to pump times
+- [x] Recipe model: learns the creamer:tea mix from 1–5 star ratings
+- [ ] Map a recipe (`creamer` %, `volume_ml`) to pump times (needs each pump's ml per second)
 
 ## Getting started
 

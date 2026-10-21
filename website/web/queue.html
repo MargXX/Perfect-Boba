@@ -39,7 +39,7 @@
 <script type="module">
 import {
   ORDERS, MACHINE_STATE, doc, getDoc, updateDoc, onSnapshot, query, where, orderBy,
-  getOrderId, machineOnline, ding, db
+  getOrderId, machineOnline, ding, db, escapeHtml
 } from "/app.js";
 import { collection } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
@@ -99,7 +99,7 @@ onSnapshot(activeQ, (snap) => {
     const data = d.data();
     const li = document.createElement("li");
     const isMe = d.id === myId;
-    li.innerHTML = `<span>${pos}. ${data.name}${isMe ? " (you)" : ""}</span>
+    li.innerHTML = `<span>${pos}. ${escapeHtml(data.name)}${isMe ? " (you)" : ""}</span>
                     <span class="status-pill ${data.status}">${data.status.replace("_"," ")}</span>`;
     if (isMe) {
       document.getElementById("position").textContent = "#" + pos;

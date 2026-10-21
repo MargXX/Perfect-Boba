@@ -12,8 +12,5 @@ const db = admin.firestore();
     paused: false,
     last_heartbeat_ms: 0,
   }, { merge: true });
-  await db.doc("calibration/current").set({
-    defaults: { tea: 50, sweet: 50, milk: 40 },
-  }, { merge: true });
-  console.log("seeded /machine/state and /calibration/current");
+  console.log("seeded /machine/state");
 })();

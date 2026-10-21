@@ -6,7 +6,8 @@
       { "source": "/order", "destination": "/index.html" },
       { "source": "/queue", "destination": "/queue.html" },
       { "source": "/rate/**", "destination": "/rate.html" },
-      { "source": "/admin", "destination": "/admin.html" }
+      { "source": "/admin", "destination": "/admin.html" },
+      { "source": "/dev", "destination": "/dev.html" }
     ]
   },
   "firestore": {

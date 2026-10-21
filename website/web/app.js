@@ -1,33 +1,76 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
-  getFirestore, collection, addDoc, doc, getDoc, updateDoc,
-  onSnapshot, query, where, orderBy, serverTimestamp
+  getFirestore, collection, addDoc, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, writeBatch,
+  onSnapshot, query, where, orderBy, limit, serverTimestamp, getCountFromServer
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import {
+  getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { learn } from "/ml.js";
 
 export const firebaseConfig = {
-  apiKey: "AIzaSyBvweZ8dG93y2DnIVo3n0OhD8RLUEHlypo",
-  authDomain: "boba-bot-1973b.firebaseapp.com",
-  projectId: "boba-bot-1973b",
-  storageBucket: "boba-bot-1973b.firebasestorage.app",
-  messagingSenderId: "548176507819",
-  appId: "1:548176507819:web:6e759a17f4a053fc2dd8ee"
+  apiKey: "AIzaSyBG7V9FVRsqaenN9nBJ1PossDsXbKR_0b8",
+  authDomain: "perfect-boba-bot.firebaseapp.com",
+  projectId: "perfect-boba-bot",
+  storageBucket: "perfect-boba-bot.firebasestorage.app",
+  messagingSenderId: "686342659061",
+  appId: "1:686342659061:web:bd4ac0bf51618821da5ebc"
 };
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
+export const auth = getAuth(app);
 
 export const ORDERS = collection(db, "orders");
 export const MACHINE_STATE = doc(db, "machine", "state");
+export const ACTIVE_STATUSES = ["queued", "awaiting_cup", "dispensing"];
 
-export { addDoc, doc, getDoc, updateDoc, onSnapshot, query, where, orderBy, serverTimestamp };
+// Cup choices, in fluid ounces of liquid (creamer + tea, not counting pearls).
+export const SIZES_OZ = [8, 12, 16, 20];
+export const DEFAULT_OZ = 12;
+export const ozToMl = (oz) => Math.round(oz * 29.5735);
+
+// The dev page signs in as this account; its password is the dev passcode.
+export const DEV_EMAIL = "dev@bobabot.local";
+
+export {
+  addDoc, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, writeBatch, onSnapshot, query, where,
+  orderBy, limit, serverTimestamp, signInWithEmailAndPassword, signOut, onAuthStateChanged
+};
 
 export function saveOrderId(id) { localStorage.setItem("orderId", id); }
 export function getOrderId() { return localStorage.getItem("orderId"); }
 
 export function machineOnline(state) {
-  if (!state?.last_heartbeat) return false;
-  const hb = state.last_heartbeat.toMillis ? state.last_heartbeat.toMillis() : state.last_heartbeat;
-  return Date.now() - hb < 30_000;
+  const hb = state?.last_heartbeat_ms ?? state?.last_heartbeat;
+  if (!hb) return false;
+  return Date.now() - (hb.toMillis ? hb.toMillis() : hb) < 30_000;
+}
+
+// Fit the recipe model to every rated order.
+export async function loadModel() {
+  const snap = await getDocs(query(ORDERS, where("rating", ">=", 1)));
+  return learn(snap.docs.map((d) => d.data()));
+}
+
+export async function countOrders() {
+  const snap = await getCountFromServer(ORDERS);
+  return snap.data().count;
+}
+
+export function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+}
+
+export function describeRecipe(o) {
+  const r = o.recipe || {};
+  const parts = [];
+  if (o.size_oz) parts.push(`${o.size_oz} oz`);
+  if (typeof r.creamer === "number") parts.push(`${r.creamer}% creamer`);
+  if (r.tapioca) parts.push("🫧");
+  if (o.mode) parts.push(o.mode === "ml" ? "🤖" : "picky");
+  return parts.join(" · ");
 }
 
 export function ding() {

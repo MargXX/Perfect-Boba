@@ -7,31 +7,45 @@ service cloud.firestore {
       allow read: if true;
       allow create: if request.resource.data.status == "queued"
                     && request.resource.data.keys().hasOnly(
-                         ["name", "recipe", "status", "created_at", "rating"])
+                         ["name", "mode", "size_oz", "recipe", "model", "status", "created_at", "rating"])
+                    && request.resource.data.mode in ["ml", "picky"]
                     && request.resource.data.rating == null;
-      allow update: if onlyRatingChanged()
-                    && request.resource.data.rating is int
-                    && request.resource.data.rating >= 1
-                    && request.resource.data.rating <= 5;
-      allow delete: if false;
+      allow update: if isMachine() || isDev() || rating() || cancelling();
+      allow delete: if isDev();
     }
 
     match /machine/state {
       allow read: if true;
-      allow write: if isMachine();
+      allow write: if isMachine() || isDev();
     }
 
-    match /calibration/current {
-      allow read: if true;
-      allow write: if isMachine();
+    // One 1–5 rating per order, after it's been made.
+    function rating() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(["rating"])
+          && resource.data.status == "done"
+          && resource.data.rating == null
+          && request.resource.data.rating is int
+          && request.resource.data.rating >= 1
+          && request.resource.data.rating <= 5;
     }
 
-    function onlyRatingChanged() {
-      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(["rating"]);
+    // Guests can cancel an order that hasn't started yet.
+    function cancelling() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status"])
+          && resource.data.status == "queued"
+          && request.resource.data.status == "cancelled";
     }
 
+    // Signing in as these emails needs their password, so the email is enough.
+    // (The role claim is the older way, set by tools/grant_machine_role.js.)
     function isMachine() {
-      return request.auth != null && request.auth.token.role == "machine";
+      return request.auth != null
+          && (request.auth.token.email == "machine@bobabot.local" || request.auth.token.role == "machine");
+    }
+
+    function isDev() {
+      return request.auth != null
+          && (request.auth.token.email == "dev@bobabot.local" || request.auth.token.role == "dev");
     }
   }
 }

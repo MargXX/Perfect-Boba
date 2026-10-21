@@ -9,12 +9,13 @@
 <body>
 <main>
   <h1>Admin</h1>
+  <p class="order-count" id="order-count">&nbsp;</p>
   <div id="offline" class="machine-offline" hidden>Machine is offline.</div>
 
   <div class="card">
     <h2 style="margin-top:0">Machine</h2>
     <p id="machine-info">—</p>
-    <button id="pause" class="secondary">Pause queue</button>
+    <p class="hint">Pause, clear the queue and more on the <a href="/dev">dev page</a>.</p>
   </div>
 
   <div class="card">
@@ -30,9 +31,14 @@
 
 <script type="module">
 import {
-  MACHINE_STATE, doc, updateDoc, onSnapshot, query, where, orderBy, machineOnline, db
+  MACHINE_STATE, ORDERS, onSnapshot, query, where, orderBy, limit, machineOnline, countOrders,
+  escapeHtml, describeRecipe
 } from "/app.js";
-import { collection, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const showCount = () => countOrders()
+  .then((n) => document.getElementById("order-count").textContent = `🧋 ${n} orders so far`)
+  .catch(() => {});
+showCount();
 
 onSnapshot(MACHINE_STATE, (snap) => {
   const d = snap.data() || {};
@@ -40,28 +46,22 @@ onSnapshot(MACHINE_STATE, (snap) => {
   document.getElementById("offline").hidden = online;
   document.getElementById("machine-info").textContent =
     `busy=${d.is_busy ?? "?"} paused=${d.paused ?? false} current=${d.current_order_id ?? "—"}`;
-  document.getElementById("pause").textContent = d.paused ? "Resume queue" : "Pause queue";
-});
-
-document.getElementById("pause").addEventListener("click", async () => {
-  const cur = (await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js"))
-    .getDoc ? null : null;
-  await updateDoc(MACHINE_STATE, { paused_request: Date.now() });
 });
 
 const active = query(
-  collection(db, "orders"),
+  ORDERS,
   where("status", "in", ["queued","awaiting_cup","dispensing"]),
   orderBy("created_at", "asc")
 );
 onSnapshot(active, (snap) => {
   const list = document.getElementById("active"); list.innerHTML = "";
   let n = 0;
+  showCount();
   snap.forEach(d => {
     n++;
     const x = d.data();
     const li = document.createElement("li");
-    li.innerHTML = `<span>${n}. ${x.name} — T${x.recipe.tea}/S${x.recipe.sweet}/M${x.recipe.milk}${x.recipe.tapioca?"+🫧":""}</span>
+    li.innerHTML = `<span>${n}. ${escapeHtml(x.name)} — ${escapeHtml(describeRecipe(x))}</span>
                     <span class="status-pill ${x.status}">${x.status}</span>`;
     list.appendChild(li);
   });
@@ -69,7 +69,7 @@ onSnapshot(active, (snap) => {
 });
 
 const doneQ = query(
-  collection(db, "orders"),
+  ORDERS,
   where("status", "in", ["done","rated"]),
   orderBy("created_at", "desc"),
   limit(10)
@@ -79,7 +79,7 @@ onSnapshot(doneQ, (snap) => {
   snap.forEach(d => {
     const x = d.data();
     const li = document.createElement("li");
-    li.innerHTML = `<span>${x.name}</span>
+    li.innerHTML = `<span>${escapeHtml(x.name)} — ${escapeHtml(describeRecipe(x))}</span>
                     <span>${x.rating ? "★".repeat(x.rating) : "unrated"}</span>`;
     list.appendChild(li);
   });

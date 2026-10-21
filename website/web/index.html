@@ -9,7 +9,8 @@
 <body>
 <main>
   <h1>BobaBot</h1>
-  <p class="subtitle">End-of-year boba. Build your drink.</p>
+  <p class="subtitle">Boba that learns from your ratings.</p>
+  <p class="order-count" id="order-count">&nbsp;</p>
 
   <div id="offline" class="machine-offline" hidden>Machine is offline — hang tight.</div>
 
@@ -17,26 +18,22 @@
     <label for="name">Your name</label>
     <input id="name" type="text" maxlength="20" placeholder="e.g. Michael" required>
 
-    <label>Tea strength <span class="slider-val" id="tea-val">50</span></label>
-    <div class="slider-row">
-      <input id="tea" type="range" min="0" max="100" value="50">
-    </div>
-
-    <label>Sweetness <span class="slider-val" id="sweet-val">50</span></label>
-    <div class="slider-row">
-      <input id="sweet" type="range" min="0" max="100" value="50">
-    </div>
-
-    <label>Milk <span class="slider-val" id="milk-val">40</span></label>
-    <div class="slider-row">
-      <input id="milk" type="range" min="0" max="100" value="40">
-    </div>
+    <label>How much drink? <small class="label-note">(liquid oz)</small></label>
+    <div class="segmented" id="sizes"></div>
 
     <label class="checkbox-row">
       <input id="tapioca" type="checkbox" checked> Tapioca pearls
     </label>
 
-    <button id="submit" type="submit">Place order</button>
+    <button type="submit" data-mode="ml">🤖 Order now</button>
+    <p class="hint" id="ml-hint">The robot picks your mix from everyone's ratings.</p>
+
+    <button type="button" id="picky-toggle" class="secondary">I'm picky</button>
+    <div id="picky" hidden>
+      <div id="knobs"></div>
+      <button type="submit" data-mode="picky">Place my order</button>
+      <p class="hint">Picky cups still help: your rating teaches the robot too.</p>
+    </div>
   </form>
 
   <p class="subtitle" style="text-align:center">
@@ -46,14 +43,45 @@
 
 <script type="module">
 import {
-  ORDERS, MACHINE_STATE, addDoc, onSnapshot, serverTimestamp, saveOrderId, machineOnline
+  ORDERS, MACHINE_STATE, SIZES_OZ, DEFAULT_OZ, ozToMl, addDoc, onSnapshot, serverTimestamp, saveOrderId,
+  machineOnline, loadModel, countOrders
 } from "/app.js";
+import { KNOBS, learn, pickRecipe } from "/ml.js";
 
-for (const id of ["tea","sweet","milk"]) {
-  const el = document.getElementById(id);
-  const val = document.getElementById(id + "-val");
-  el.addEventListener("input", () => val.textContent = el.value);
+const sizes = document.getElementById("sizes");
+for (const oz of SIZES_OZ) {
+  sizes.insertAdjacentHTML("beforeend", `
+    <label><input type="radio" name="size" value="${oz}" ${oz === DEFAULT_OZ ? "checked" : ""}>
+      <span>${oz} oz<small>${ozToMl(oz)} ml</small></span></label>`);
 }
+
+const knobs = document.getElementById("knobs");
+for (const k of KNOBS) {
+  knobs.insertAdjacentHTML("beforeend", `
+    <label for="knob-${k.key}">${k.label} <span class="slider-val" id="knob-${k.key}-val"></span></label>
+    <div class="slider-row"><input id="knob-${k.key}" type="range" min="0" max="100" value="${k.default}"></div>`);
+  const el = document.getElementById(`knob-${k.key}`);
+  const val = document.getElementById(`knob-${k.key}-val`);
+  const show = () => val.textContent = k.describe(Number(el.value));
+  el.addEventListener("input", show); show();
+}
+
+document.getElementById("picky-toggle").addEventListener("click", () => {
+  const panel = document.getElementById("picky");
+  panel.hidden = !panel.hidden;
+});
+
+countOrders()
+  .then((n) => document.getElementById("order-count").textContent =
+    `🧋 ${n} ${n === 1 ? "cup" : "cups"} ordered so far`)
+  .catch(() => {});
+
+// Learn from all ratings once on load; fall back to the default recipe.
+const modelReady = loadModel().catch((err) => { console.warn(err); return learn([]); });
+modelReady.then((m) => {
+  if (m.n) document.getElementById("ml-hint").textContent =
+    `The robot picks your mix, learned from ${m.n} ${m.n === 1 ? "rating" : "ratings"}.`;
+});
 
 onSnapshot(MACHINE_STATE, (snap) => {
   document.getElementById("offline").hidden = machineOnline(snap.data());
@@ -61,17 +89,27 @@ onSnapshot(MACHINE_STATE, (snap) => {
 
 document.getElementById("order-form").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const btn = document.getElementById("submit");
-  btn.disabled = true; btn.textContent = "Placing…";
+  const mode = e.submitter?.dataset.mode || "ml";
+  const btn = e.submitter;
+  const label = btn?.textContent;
+  if (btn) { btn.disabled = true; btn.textContent = "Placing…"; }
   try {
+    const sizeOz = Number(document.querySelector("input[name=size]:checked").value);
+    let mix, model = null;
+    if (mode === "ml") {
+      const m = await modelReady;
+      mix = pickRecipe(m);
+      model = { n: m.n, best: m.best, predicted: m.predicted };
+    } else {
+      mix = Object.fromEntries(KNOBS.map((k) =>
+        [k.key, Number(document.getElementById(`knob-${k.key}`).value)]));
+    }
     const ref = await addDoc(ORDERS, {
       name: document.getElementById("name").value.trim() || "Someone",
-      recipe: {
-        tea: Number(document.getElementById("tea").value),
-        sweet: Number(document.getElementById("sweet").value),
-        milk: Number(document.getElementById("milk").value),
-        tapioca: document.getElementById("tapioca").checked
-      },
+      mode,
+      size_oz: sizeOz,
+      recipe: { ...mix, volume_ml: ozToMl(sizeOz), tapioca: document.getElementById("tapioca").checked },
+      model,
       status: "queued",
       created_at: serverTimestamp(),
       rating: null
@@ -80,7 +118,7 @@ document.getElementById("order-form").addEventListener("submit", async (e) => {
     location.href = "/queue";
   } catch (err) {
     alert("Could not place order: " + err.message);
-    btn.disabled = false; btn.textContent = "Place order";
+    if (btn) { btn.disabled = false; btn.textContent = label; }
   }
 });
 </script>
