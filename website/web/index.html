@@ -79,8 +79,8 @@ document.getElementById("picky-toggle").addEventListener("click", () => {
 });
 
 Promise.all([loadCupCounts(), meReady])
-  .then(([people, me]) => {
-    const rank = people.findIndex((p) => p.id === me);
+  .then(([people, myId]) => {
+    const rank = people.findIndex((p) => p.id === myId);
     if (rank < 0) return;
     const me = people[rank];
     const el = document.getElementById("my-cups");
