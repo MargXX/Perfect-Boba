@@ -46,11 +46,13 @@
 <script type="module">
 import {
   ORDERS, MACHINE_STATE, SIZES_OZ, DEFAULT_OZ, ozToMl, addDoc, onSnapshot, serverTimestamp, saveOrderId,
-  machineOnline, loadModel, countOrders, loadCupCounts, getDrinkerId, getSavedName, saveName
+  machineOnline, loadModel, countOrders, loadCupCounts, resolveDrinker, getDrinkerId, getSavedName, saveName
 } from "/app.js";
 import { KNOBS, learn, forDrinker, pickRecipe } from "/ml.js";
 
 const drinkerId = getDrinkerId();
+// Who this phone counts as, if the dev merged it into another phone.
+const meReady = resolveDrinker(drinkerId).catch(() => drinkerId);
 document.getElementById("name").value = getSavedName();
 
 const sizes = document.getElementById("sizes");
@@ -76,9 +78,9 @@ document.getElementById("picky-toggle").addEventListener("click", () => {
   panel.hidden = !panel.hidden;
 });
 
-loadCupCounts()
-  .then((people) => {
-    const rank = people.findIndex((p) => p.id === drinkerId);
+Promise.all([loadCupCounts(), meReady])
+  .then(([people, me]) => {
+    const rank = people.findIndex((p) => p.id === me);
     if (rank < 0) return;
     const me = people[rank];
     const el = document.getElementById("my-cups");
@@ -96,11 +98,12 @@ countOrders()
 const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 const modelReady = loadModel()
   .catch((err) => { console.warn(err); return learn([]); })
-  .then((m) => forDrinker(m, drinkerId));
+  .then(async (m) => forDrinker(m, await meReady));
 modelReady.then((m) => {
   const hint = document.getElementById("ml-hint");
+  // Never reveal the recipe: "Order now" cups are meant to be a mystery.
   if (m.nMine) hint.textContent =
-    `Your usual is about ${KNOBS[0].describe(m.best[KNOBS[0].key])}, learned from your ${plural(m.nMine, "rating")}.`;
+    `The robot has learned from your ${plural(m.nMine, "rating")}. What will it make you this time?`;
   else if (m.n) hint.textContent =
     `The robot starts from the group's taste (${plural(m.n, "rating")} so far), then learns yours as you rate.`;
 });

@@ -196,3 +196,10 @@ button.small { padding: 6px 10px; font-size: 14px; width: auto; }
 .leaderboard .rank { width: 28px; text-align: center; font-weight: 700; font-size: 18px; color: var(--accent-dark); }
 .leaderboard .who { flex: 1; font-weight: 600; overflow-wrap: anywhere; }
 .leaderboard .cups { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.merge-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+.merge-row select {
+  flex: 1 1 120px; min-width: 0; font-size: 15px; padding: 8px;
+  border: 1px solid #ddd; border-radius: 8px; background: white; color: var(--ink);
+}
+.row-actions { flex-wrap: wrap; justify-content: flex-end; }

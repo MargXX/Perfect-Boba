@@ -54,6 +54,19 @@
     </div>
 
     <div class="card">
+      <h2 style="margin-top:0">Leaderboard</h2>
+      <p class="hint" style="text-align:left">Merge two entries that are the same person (e.g. two phones),
+        add or take away cups, rename, or hide someone. Orders aren't changed, so all of this can be undone.</p>
+      <div class="merge-row">
+        <select id="merge-from" aria-label="Person to merge"></select>
+        <span>into</span>
+        <select id="merge-into" aria-label="Person to keep"></select>
+        <button id="merge" class="small">Merge</button>
+      </div>
+      <ul id="people" class="order-list"></ul>
+    </div>
+
+    <div class="card">
       <h2 style="margin-top:0">Cleanup</h2>
       <button id="delete-cancelled" class="secondary">Delete cancelled orders</button>
       <button id="delete-all" class="danger" style="margin-top:8px">Delete ALL orders and ratings</button>
@@ -65,9 +78,9 @@
 
 <script type="module">
 import {
-  auth, db, ORDERS, MACHINE_STATE, ACTIVE_STATUSES, DEV_EMAIL, doc, getDocs, setDoc, updateDoc, serverTimestamp,
+  auth, db, ORDERS, MACHINE_STATE, ACTIVE_STATUSES, DEV_EMAIL, PEOPLE, doc, getDocs, setDoc, updateDoc, serverTimestamp,
   deleteDoc, writeBatch, onSnapshot, query, where, orderBy, limit, signInWithEmailAndPassword,
-  signOut, onAuthStateChanged, machineOnline, loadModel, countOrders, escapeHtml, describeRecipe, renderMachineStatus
+  signOut, onAuthStateChanged, machineOnline, loadModel, countOrders, loadPeople, escapeHtml, describeRecipe, renderMachineStatus
 } from "/app.js";
 
 const $ = (id) => document.getElementById(id);
@@ -113,6 +126,63 @@ async function eachBatch(docs, apply) {
   return docs.length;
 }
 
+// Leaderboard edits live in /people/{phone id}; see loadPeople() in app.js.
+const editPerson = (id, fields) => setDoc(doc(PEOPLE, id), fields, { merge: true });
+const short = (id) => id.slice(0, 6);
+
+async function refreshPeople() {
+  let people;
+  try { people = await loadPeople(); } catch (err) {
+    $("people").innerHTML = `<li>Couldn't load: ${escapeHtml(err.message)}</li>`; return;
+  }
+  const cups = (n) => `${n} ${n === 1 ? "cup" : "cups"}`;
+  const label = (p) => `${p.name} · ${cups(p.cups)} · ${short(p.id)}`;
+  const options = people.map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(label(p))}</option>`).join("");
+  $("merge-from").innerHTML = options;
+  $("merge-into").innerHTML = options;
+  if (people.length > 1) $("merge-into").selectedIndex = 1;
+
+  const list = $("people"); list.innerHTML = "";
+  if (!people.length) { list.innerHTML = "<li>No one yet</li>"; return; }
+  for (const p of people) {
+    const li = document.createElement("li");
+    const bonus = p.bonus ? ` (${p.made} made ${p.bonus > 0 ? "+" : "−"} ${Math.abs(p.bonus)})` : "";
+    li.innerHTML = `<span>${escapeHtml(p.name)}${p.hidden ? ' <span class="status-pill cancelled">hidden</span>' : ""}
+        <br><small>${cups(p.cups)}${bonus} · ${short(p.id)}
+        ${p.members.length ? ` · merged: ${p.members.map(short).join(", ")}` : ""}</small></span>
+      <span class="row-actions"></span>`;
+    const actions = [
+      ["−1", () => editPerson(p.id, { bonus: (p.bonusOwn || 0) - 1 })],
+      ["+1", () => editPerson(p.id, { bonus: (p.bonusOwn || 0) + 1 })],
+      ["Name", () => {
+        const name = prompt("Name on the leaderboard (blank = use their order name):", p.name);
+        if (name === null) return;
+        return editPerson(p.id, { name: name.trim() || null });
+      }],
+      [p.hidden ? "Show" : "Hide", () => editPerson(p.id, { hidden: !p.hidden })],
+      ...p.members.map((m) => [`Unmerge ${short(m)}`, () => editPerson(m, { merged_into: null })]),
+    ];
+    for (const [text, fn] of actions) {
+      const b = document.createElement("button");
+      b.className = "small secondary"; b.textContent = text;
+      b.addEventListener("click", async () => {
+        b.disabled = true;
+        try { await fn(); await refreshPeople(); } catch (err) { alert(err.message); b.disabled = false; }
+      });
+      li.querySelector(".row-actions").appendChild(b);
+    }
+    list.appendChild(li);
+  }
+}
+
+$("merge").addEventListener("click", async () => {
+  const from = $("merge-from").value, into = $("merge-into").value;
+  if (!from || !into || from === into) return alert("Pick two different people.");
+  const name = (sel) => sel.options[sel.selectedIndex].textContent;
+  if (!confirm(`Merge "${name($("merge-from"))}" into "${name($("merge-into"))}"?\nTheir cups and ratings will count as one person.`)) return;
+  try { await editPerson(from, { merged_into: into }); await refreshPeople(); } catch (err) { alert(err.message); }
+});
+
 async function refreshStats() {
   try {
     const m = await loadModel();
@@ -146,6 +216,7 @@ function orderRow(d, buttons) {
 
 function start() {
   refreshStats();
+  refreshPeople();
 
   unsubs.push(onSnapshot(MACHINE_STATE, (snap) => {
     const d = snap.data() || {};

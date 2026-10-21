@@ -19,13 +19,13 @@
 </main>
 
 <script type="module">
-import { loadCupCounts, getDrinkerId, escapeHtml } from "/app.js";
+import { loadCupCounts, resolveDrinker, escapeHtml } from "/app.js";
 
-const me = localStorage.getItem("drinkerId") && getDrinkerId();
+const myPhone = localStorage.getItem("drinkerId");
 const medals = ["🥇", "🥈", "🥉"];
 const board = document.getElementById("board");
 
-loadCupCounts().then((people) => {
+Promise.all([loadCupCounts(), myPhone ? resolveDrinker(myPhone) : null]).then(([people, me]) => {
   if (!people.length) {
     board.innerHTML = "<li>No cups made yet. Be the first!</li>";
     return;
