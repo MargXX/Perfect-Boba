@@ -7,8 +7,8 @@ set number of seconds. The onboard LED (GPIO 2) is lit while any pump is on.
 
 Both pumps must be OFF when it starts (the buttons are toggles).
 
-With the Mac:   ./run.sh pump_server.py          (Ctrl-C to stop)
-Without:        ./install_main.sh pump_server.py, then power from the wall
+With the Mac:   ./run.sh apps/pump_server.py     (Ctrl-C to stop)
+Without:        ./install.sh apps/pump_server.py, then power from the wall
 """
 import asyncio
 import json

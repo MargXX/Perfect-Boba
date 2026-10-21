@@ -28,4 +28,4 @@ PORT_ARG=""
 # whose flash chip is flaky at the faster defaults. Override with BAUD=460800 ./flash.sh
 .venv/bin/esptool.py --chip "$CHIP" $PORT_ARG --baud "${BAUD:-115200}" write_flash \
   --flash_mode dio --flash_freq 40m -z "$OFFSET" "firmware/$BIN"
-echo "MicroPython installed. Next: ./upload.sh"
+echo "MicroPython installed. Next: ./run.sh apps/pump_server.py"

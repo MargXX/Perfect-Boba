@@ -73,7 +73,7 @@ void flashLed() {
   digitalWrite(LED_PIN, LOW);
 }
 
-// Must match press_check() in ESP32_Code/button.py.
+// Must match press_check() in ESP32_Code/lib/button.py.
 long pressCheck(long n, long id) {
   return (n * 7 + id) % 97;
 }

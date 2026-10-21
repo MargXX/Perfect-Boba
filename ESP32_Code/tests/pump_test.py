@@ -1,6 +1,6 @@
 """
 Pump test. Both pumps must be OFF when you start.
-Run:  ./run.sh pump_test.py
+Run:  ./run.sh tests/pump_test.py
 """
 from button import ButtonPresser
 from pumps import Pump, run_together

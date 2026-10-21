@@ -3,7 +3,7 @@ Find which GPIO the servo's signal wire is on.
 Sends a servo sweep to each pin in turn and prints the pin number —
 whichever number is on screen when the servo moves is your pin.
 
-Run:  ./run.sh pin_finder.py      (Ctrl-C to stop)
+Run:  ./run.sh tests/pin_finder.py      (Ctrl-C to stop)
 """
 from servo import Servo
 import time

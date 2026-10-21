@@ -1,6 +1,6 @@
 """
 Quick hardware check for an MG995 / MG996R.
-Run without copying to the board:   ./run.sh servo_test.py
+Run without copying to the board:   ./run.sh tests/servo_test.py
 """
 from servo import Servo
 import time

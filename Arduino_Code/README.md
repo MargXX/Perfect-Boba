@@ -1,6 +1,6 @@
 # Arduino code (Uno)
 
-The Uno drives the button-pressing servos (up to 2). The ESP32 tells it when to press over one wire (see `ESP32_Code/button.py`).
+The Uno drives the button-pressing servos (up to 2). The ESP32 tells it when to press over one wire (see `ESP32_Code/lib/button.py`).
 
 Tools: `arduino-cli` (`brew install arduino-cli`), with the `arduino:avr` core and the `Servo` library installed.
 

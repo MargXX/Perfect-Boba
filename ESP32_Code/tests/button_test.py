@@ -1,6 +1,6 @@
 """
 Presses the button 3 times via the Arduino.
-Run:  ./run.sh button_test.py
+Run:  ./run.sh tests/button_test.py
 """
 from button import ButtonPresser
 import time

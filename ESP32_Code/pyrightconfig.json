@@ -1,6 +1,7 @@
 {
   "venvPath": ".",
   "venv": ".venv",
+  "extraPaths": ["lib"],
   "typeCheckingMode": "basic",
   "reportMissingModuleSource": false
 }

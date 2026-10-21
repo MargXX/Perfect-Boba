@@ -1,10 +1,40 @@
 # ESP32 code (MicroPython)
 
-The ESP32 is the machine's brain. It decides when each pump runs and tells the Arduino Uno (`../Arduino_Code`) to press the pumps' toggle buttons with servos. `main.py` runs automatically on boot.
+The ESP32 is the machine's brain. It decides when each pump runs and tells the Arduino Uno (`../Arduino_Code`) to press the pumps' toggle buttons with servos.
+
+## Folder layout
+
+```
+ESP32_Code/
+├── lib/                    Libraries the programs import (installed to /lib on the board)
+│   ├── button.py             Sends PRESS / ANGLE commands to the Uno over UART
+│   ├── pumps.py              Pump class: tracks each toggle pump's on/off state
+│   └── servo.py              Drives a servo straight from an ESP32 pin (PWM)
+├── apps/                   Programs that run the machine (one becomes the board's main.py)
+│   ├── pump_server.py        Phone control page over the ESP32's own WiFi
+│   └── gpio_recipe.py        Early prototype: recipe on pumps wired directly to GPIO pins
+├── tests/                  Hardware test scripts
+│   ├── pump_test.py          Each pump for 10 s, then both together
+│   ├── pump_loop_test.py     Endless alternating pump runs, for reliability checks
+│   ├── button_test.py        Presses servo 1 three times
+│   ├── pin_finder.py         Sweeps a servo on each GPIO to find which pin it's on
+│   └── servo_test.py         Drives a servo directly from the ESP32 (no Uno)
+├── tools/                  Mac-side helpers used by the scripts (never copied to the board)
+│   ├── esp32_port.sh         Finds the ESP32's serial port
+│   └── hard_reset.py         Resets the ESP32 over USB and waits for it to boot
+├── run.sh                  Run a script on the board without installing it
+├── install.sh              Install a program so it runs on its own at power-up
+├── flash.sh                Erase the board and install MicroPython (one time)
+├── wifi_config_example.py  Template for wifi_config.py (the real one is gitignored)
+├── requirements.txt        Mac-side Python tools (esptool, mpremote, editor stubs)
+└── pyrightconfig.json      Editor settings so VS Code understands MicroPython + lib/
+```
+
+On the board, an installed setup looks like `/main.py` (the program), `/wifi_config.py` and `/lib/*.py`. MicroPython searches `/lib` for imports automatically.
 
 ## One-time setup
 
-The tools (`esptool`, `mpremote`, editor stubs) are in `.venv/`. To recreate the venv on another machine:
+The Mac-side tools are in `.venv/`. To recreate the venv on another machine:
 
 ```sh
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
@@ -24,19 +54,22 @@ If it can't connect, hold the **BOOT** button while it connects.
 
 | Command | What it does |
 |---|---|
-| `./run.sh pump_server.py` | Runs a script on the board without saving it (Ctrl-C to stop) |
+| `./run.sh apps/pump_server.py` | Runs a script on the board without installing it, using `lib/` and `wifi_config.py` straight from the Mac (Ctrl-C to stop) |
+| `./run.sh tests/pump_test.py` | Same, for a test |
 | `./run.sh` | Opens the interactive REPL (Ctrl-] to exit) |
-| `./install_main.sh pump_server.py` | Saves a script as the board's `main.py`, so it runs on its own at power-up |
-| `./upload.sh` | Copies every `.py` file to the board and resets it |
+| `./install.sh apps/pump_server.py` | Installs `lib/`, `wifi_config.py` and the program as `main.py`, so it runs on its own at power-up |
+| `./install.sh --remove` | Deletes `main.py`, so nothing runs at power-up |
 
-`run.sh` hard-resets the board first, so a run that was interrupted can't leave it stuck. All the scripts connect to the ESP32's port explicitly (`tools/esp32_port.sh`). Otherwise mpremote can pick the Uno instead when both are plugged in.
+`run.sh` and `install.sh` hard-reset the board first, so a run that was interrupted can't leave it stuck. All the scripts connect to the ESP32's port explicitly. Otherwise mpremote can pick the Uno instead when both are plugged in.
 
-## Phone control over WiFi (`pump_server.py`)
+After changing anything in `lib/` or `apps/`, run `./install.sh …` again to update the board. `run.sh` always uses the current files on the Mac.
+
+## Phone control over WiFi (`apps/pump_server.py`)
 
 The ESP32 creates its own WiFi network. No school or home WiFi is needed.
 
 1. Make sure both pumps are **off**. The buttons are toggles, so the program assumes they start off.
-2. Run `./run.sh pump_server.py`, or `./install_main.sh pump_server.py` to run it from the wall without the Mac.
+2. Run `./run.sh apps/pump_server.py`, or `./install.sh apps/pump_server.py` to run it from the wall without the Mac.
 3. On your phone, join the network set in `wifi_config.py` (default `BobaBot`). Stay connected even if the phone says there's no internet.
 4. Open **http://192.168.4.1**.
 
@@ -44,7 +77,7 @@ Each pump has **Run** (for a number of seconds, up to 120) and **Stop**, and bot
 
 The ESP32 only supports 2.4 GHz WPA2 WiFi with a plain password. It can't join networks like "Brown" that use a username and password (enterprise WiFi).
 
-## Pumps in code
+## Libraries (`lib/`)
 
 ```python
 from button import ButtonPresser
@@ -59,18 +92,9 @@ pump2.on(); pump2.off()
 run_together({pump1: 10, pump2: 5})  # both at once, each with its own time
 ```
 
-- `button.py` sends `PRESS` commands to the Uno over UART (GPIO 18 → Uno pin 2). Each press is sent 3 times with an id and checksum. The Uno acts on the first good copy, so a garbled command can't cause an extra toggle.
-- `pumps.py` tracks whether each pump is on and waits 1.3 s after each press so commands never overlap.
-
-## Tests
-
-| Script | What it does |
-|---|---|
-| `pump_test.py` | Pump 1 for 10 s, pump 2 for 10 s, then both together |
-| `pump_loop_test.py` | Runs forever: one pump for 5 s every 20 s, alternating, with the LED on while pumping. Good for long reliability checks. |
-| `button_test.py` | Presses servo 1 three times |
-| `pin_finder.py` | Sweeps a servo on each GPIO in turn, to find which pin it's on |
-| `servo_test.py` | Drives a servo directly from the ESP32 (no Uno) |
+- **`button.py`** sends `PRESS <servo> <id> <check>` lines to the Uno over UART at 9600 baud (GPIO 18 → Uno pin 2). The link is one-way with no acknowledgments, so each press is sent 3 times with the same id and a checksum. The Uno acts on the first intact copy and ignores the rest, so a garbled command can't cause an extra toggle.
+- **`pumps.py`** remembers whether each pump is on, and waits 1.3 s after each press so commands never overlap.
+- **`servo.py`** drives a servo directly with the ESP32's PWM hardware (50 Hz, 500–2500 µs pulses). The current setup doesn't use it, since the Uno drives the servos, but `tests/servo_test.py` and `tests/pin_finder.py` do.
 
 ## Wiring
 
@@ -91,11 +115,12 @@ The servos are wired to and powered by the Uno. See `../Arduino_Code/README.md`.
 | `Guru Meditation Error … IllegalInstruction` when a servo moves | Ground loop. Remove the ESP32 ↔ Uno GND jumper when both boards share a USB source |
 | Boot loop with `flash read err` | Something is on GPIO 6–11 or 12, or a servo is powered from the ESP32's 5V pin. Unplug it |
 | A pump is on when the page says off (or the reverse) | A press was lost, or the button was pressed by hand. Use "Out of sync?" on the page |
+| `ImportError: no module named 'button'` | When running by hand, `lib/` isn't on the import path. Use `./run.sh`, or `./install.sh` to put the libraries in `/lib` on the board |
 | `PWM is inactive` | MicroPython 1.29 bug with `duty_ns=` in the `PWM()` constructor. `servo.py` works around it |
 
-## Servos driven directly by the ESP32
+## Driving a servo directly from the ESP32
 
-`servo.py` can also drive an MG995/MG996R straight from an ESP32 pin, but the current setup uses the Uno instead. The servo's power surges made this ESP32 reset.
+`lib/servo.py` can drive an MG995/MG996R straight from an ESP32 pin. The current setup uses the Uno instead, because the servo's power surges made this ESP32 reset.
 
 ```python
 from servo import Servo, ContinuousServo

@@ -1,16 +1,32 @@
 #!/usr/bin/env bash
-# Run a script on the ESP32 without saving it, using the libraries already on the board.
-# Usage: ./run.sh servo_test.py     (no argument = open the REPL; Ctrl-] to exit)
+# Run a script on the ESP32 without saving it to the board.
+# Usage: ./run.sh apps/pump_server.py
+#        ./run.sh tests/pump_test.py
+#        ./run.sh                       (no argument = open the REPL; Ctrl-] to exit)
 set -euo pipefail
 cd "$(dirname "$0")"
 MP=".venv/bin/mpremote connect $(tools/esp32_port.sh)"
 
 if [ $# -eq 0 ]; then
   $MP repl
-else
-  # Hard-reset first: if a previous run was interrupted, the board can be left
-  # hung and refuse to connect ("could not enter raw repl").
-  .venv/bin/python tools/hard_reset.py
-  # mount . makes local files (servo.py etc.) importable without uploading
-  $MP mount . run "$1"
+  exit
 fi
+if [ ! -f "$1" ]; then
+  echo "No such file: $1"
+  exit 1
+fi
+
+# Hard-reset first: if a previous run was interrupted, the board can be left
+# hung and refuse to connect ("could not enter raw repl").
+.venv/bin/python tools/hard_reset.py
+
+# "mount ." makes this folder appear on the board as /remote (the working
+# directory), so wifi_config.py and lib/ are used straight from the Mac.
+# The script gets a one-line prefix that puts /remote/lib first on the import
+# path (on the board itself, installed libraries live in /lib, which MicroPython
+# searches by default). Error line numbers are therefore off by one.
+tmpdir=$(mktemp -d)
+trap 'rm -rf "$tmpdir"' EXIT
+script="$tmpdir/$(basename "$1")"
+{ echo "import sys; sys.path.insert(0, '/remote/lib')"; cat "$1"; } > "$script"
+$MP mount . run "$script"

@@ -1,3 +1,6 @@
+# Early prototype (the original main.py): runs a recipe by switching pumps wired
+# straight to ESP32 GPIO pins for timed durations. The current setup uses
+# servo-pressed toggle pumps instead (see pump_server.py and lib/pumps.py).
 from machine import Pin
 import time
 

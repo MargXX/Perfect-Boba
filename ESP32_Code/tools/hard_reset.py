@@ -1,7 +1,7 @@
 """
 Hard-reset the ESP32 over USB (same as pressing its EN button), then wait for
 MicroPython to boot. Runs on the Mac, not the board — it lives in tools/ so
-upload.sh doesn't copy it to the ESP32.
+install.sh doesn't copy it to the ESP32.
 
 Usage: .venv/bin/python tools/hard_reset.py [port]
 """

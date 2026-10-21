@@ -5,8 +5,8 @@ while a pump should be pumping, so you can compare it with the real pump.
 
 Both pumps must be OFF when it starts.
 
-With the Mac:   ./run.sh pump_loop_test.py        (Ctrl-C to stop)
-Without:        ./install_main.sh pump_loop_test.py, then power from the wall
+With the Mac:   ./run.sh tests/pump_loop_test.py  (Ctrl-C to stop)
+Without:        ./install.sh tests/pump_loop_test.py, then power from the wall
 """
 from machine import Pin
 from button import ButtonPresser
