@@ -22,9 +22,8 @@
     <label>How much drink? <small class="label-note">(liquid oz)</small></label>
     <div class="segmented" id="sizes"></div>
 
-    <label class="checkbox-row">
-      <input id="tapioca" type="checkbox" checked> Tapioca pearls
-    </label>
+    <label>Tea</label>
+    <div class="segmented" id="teas"></div>
 
     <button type="submit" data-mode="ml">🤖 Order now</button>
     <p class="hint" id="ml-hint">The robot picks your mix from everyone's ratings.</p>
@@ -32,6 +31,7 @@
     <button type="button" id="picky-toggle" class="secondary">I'm picky</button>
     <div id="picky" hidden>
       <div id="knobs"></div>
+      <p class="hint" id="water-note" style="text-align:left"></p>
       <button type="submit" data-mode="picky">Place my order</button>
       <p class="hint">Picky cups still help: your rating teaches the robot too.</p>
     </div>
@@ -45,7 +45,7 @@
 
 <script type="module">
 import {
-  ORDERS, MACHINE_STATE, SIZES_OZ, DEFAULT_OZ, ozToMl, addDoc, onSnapshot, serverTimestamp, saveOrderId,
+  ORDERS, MACHINE_STATE, SIZES_OZ, DEFAULT_OZ, TEAS, ozToMl, addDoc, onSnapshot, serverTimestamp, saveOrderId,
   machineOnline, loadModel, countOrders, loadCupCounts, resolveDrinker, getDrinkerId, getSavedName, saveName
 } from "/app.js";
 import { KNOBS, learn, forDrinker, pickRecipe } from "/ml.js";
@@ -62,16 +62,37 @@ for (const oz of SIZES_OZ) {
       <span>${oz} oz<small>${ozToMl(oz)} ml</small></span></label>`);
 }
 
+const teas = document.getElementById("teas");
+TEAS.forEach((t, i) => teas.insertAdjacentHTML("beforeend", `
+  <label><input type="radio" name="tea" value="${t.key}" ${i === 0 ? "checked" : ""}><span>${t.label}</span></label>`));
+
+// Each knob is a % of the cup and water fills the rest, so the knobs can't
+// add up to more than 100: moving one past that turns the others down.
 const knobs = document.getElementById("knobs");
+const knobEl = (k) => document.getElementById(`knob-${k.key}`);
+function showKnobs() {
+  for (const k of KNOBS) document.getElementById(`knob-${k.key}-val`).textContent = k.describe(Number(knobEl(k).value));
+  const water = 100 - KNOBS.reduce((s, k) => s + Number(knobEl(k).value), 0);
+  document.getElementById("water-note").textContent = `Water fills the rest: ${water}%`;
+}
 for (const k of KNOBS) {
   knobs.insertAdjacentHTML("beforeend", `
     <label for="knob-${k.key}">${k.label} <span class="slider-val" id="knob-${k.key}-val"></span></label>
     <div class="slider-row"><input id="knob-${k.key}" type="range" min="0" max="100" value="${k.default}"></div>`);
-  const el = document.getElementById(`knob-${k.key}`);
-  const val = document.getElementById(`knob-${k.key}-val`);
-  const show = () => val.textContent = k.describe(Number(el.value));
-  el.addEventListener("input", show); show();
 }
+for (const k of KNOBS) {
+  knobEl(k).addEventListener("input", () => {
+    let over = KNOBS.reduce((s, j) => s + Number(knobEl(j).value), 0) - 100;
+    for (const j of KNOBS) {
+      if (j === k || over <= 0) continue;
+      const cut = Math.min(over, Number(knobEl(j).value));
+      knobEl(j).value = Number(knobEl(j).value) - cut;
+      over -= cut;
+    }
+    showKnobs();
+  });
+}
+showKnobs();
 
 document.getElementById("picky-toggle").addEventListener("click", () => {
   const panel = document.getElementById("picky");
@@ -136,7 +157,7 @@ document.getElementById("order-form").addEventListener("submit", async (e) => {
       drinker_id: drinkerId,
       mode,
       size_oz: sizeOz,
-      recipe: { ...mix, volume_ml: ozToMl(sizeOz), tapioca: document.getElementById("tapioca").checked },
+      recipe: { ...mix, tea_type: document.querySelector("input[name=tea]:checked").value, volume_ml: ozToMl(sizeOz) },
       model,
       status: "queued",
       created_at: serverTimestamp(),

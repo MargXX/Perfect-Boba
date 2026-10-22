@@ -35,15 +35,19 @@ from button import ButtonPresser
 from pump_control import PumpControl
 from store import Store
 
-# Which servo presses which pump's button. Pump 3 (water, not fitted yet) isn't used for orders.
-TEA_PUMP = 1
-CREAMER_PUMP = 2
+# Which servo presses which pump's button. Orders say how much of the cup is
+# tea and creamer (%); water fills the rest. Each tea type gets its own pump
+# (keys match TEAS in website/web/app.js); a second tea would go on pump 4.
+TEA_PUMPS = {"black": 1}
+CREAMER_PUMP = 2   # sweetened creamer
 WATER_PUMP = 3
+# Pumps actually fitted. Pumps above this are skipped when pouring, so until
+# the water pump is fitted cups come out short by their water share.
+NUM_PUMPS = 2
 # How much each pump moves, in ml per second. Measured 2026-10-21: a quart
 # (946 ml) took 40–42 s, so ~23 ml/s. To re-measure: Start/Stop on /pumps.
-ML_PER_SECOND = {TEA_PUMP: 23.0, CREAMER_PUMP: 23.0}
+ML_PER_SECOND = {1: 23.0, 2: 23.0, 3: 23.0, 4: 23.0}
 
-NUM_PUMPS = 2
 MAX_QUEUE = 20          # orders waiting at once
 MAX_VOLUME_ML = 700
 MAX_SECONDS = 120       # one timed pump run on /pumps
@@ -167,7 +171,8 @@ def add_order(o, is_dev, ip):
     if (o.get("status") != "queued" or o.get("rating") is not None
             or o.get("mode") not in ("ml", "picky") or any(k not in ORDER_KEYS for k in o)
             or not isinstance(r, dict) or not 0 < r.get("volume_ml", 0) <= MAX_VOLUME_ML
-            or not 0 <= r.get("creamer", -1) <= 100):
+            or not 0 <= r.get("tea", -1) <= 100 or not 0 <= r.get("creamer", -1) <= 100
+            or r["tea"] + r["creamer"] > 100 or r.get("tea_type") not in TEA_PUMPS):
         raise Denied("That's not a valid order.")
     o["name"] = str(o.get("name") or "Someone")[:30]
     o["created_at"] = {"__ts": now_ms()}  # the queue is in this order, so the phone doesn't get a say
@@ -203,12 +208,17 @@ def update_order(oid, f, is_dev):
 # --- the machine ----------------------------------------------------------------
 
 def pump_times(recipe):
-    """{pump: seconds} for a recipe like {"creamer": 30, "volume_ml": 355}."""
-    creamer_ml = recipe["volume_ml"] * recipe["creamer"] / 100
+    """{pump: seconds} for a recipe like
+    {"tea": 35, "creamer": 25, "tea_type": "black", "volume_ml": 355}."""
+    ml = recipe["volume_ml"] / 100
+    tea_ml = ml * recipe["tea"]
+    creamer_ml = ml * recipe["creamer"]
+    tea_pump = TEA_PUMPS[recipe["tea_type"]]
     times = {}
-    for pump, ml in ((CREAMER_PUMP, creamer_ml), (TEA_PUMP, recipe["volume_ml"] - creamer_ml)):
-        if ml >= 1:
-            times[pump] = ml / ML_PER_SECOND[pump]
+    for pump, amount in ((tea_pump, tea_ml), (CREAMER_PUMP, creamer_ml),
+                         (WATER_PUMP, recipe["volume_ml"] - tea_ml - creamer_ml)):
+        if amount >= 1 and pump <= NUM_PUMPS:
+            times[pump] = amount / ML_PER_SECOND[pump]
     return times
 
 

@@ -11,10 +11,14 @@ export const ORDERS = collection(db, "orders");
 export const MACHINE_STATE = doc(db, "machine", "state");
 export const ACTIVE_STATUSES = ["queued", "awaiting_cup", "dispensing"];
 
-// Cup choices, in fluid ounces of liquid (creamer + tea, not counting pearls).
+// Cup choices, in fluid ounces of liquid (tea + creamer + water).
 export const SIZES_OZ = [8, 12, 16, 20];
 export const DEFAULT_OZ = 12;
 export const ozToMl = (oz) => Math.round(oz * 29.5735);
+
+// Teas a guest can pick. The ESP32 maps each key to a pump (TEA_PUMPS in
+// ESP32_Code/apps/boba_server.py); add the second tea here and there.
+export const TEAS = [{ key: "black", label: "Black tea" }];
 
 // The dev page signs in as this account; its password is the dev passcode.
 export const DEV_EMAIL = "dev@bobabot.local";
@@ -161,11 +165,15 @@ export function describeRecipe(o) {
   const r = o.recipe || {};
   const parts = [];
   if (o.size_oz) parts.push(`${o.size_oz} oz`);
+  const tea = TEAS.find((t) => t.key === r.tea_type);
+  if (tea && TEAS.length > 1) parts.push(tea.label);
+  if (typeof r.tea === "number") parts.push(`${r.tea}% tea`);
   if (typeof r.creamer === "number") parts.push(`${r.creamer}% creamer`);
-  if (r.tapioca) parts.push("🫧");
+  if (typeof r.tea === "number" && typeof r.creamer === "number") parts.push(`${100 - r.tea - r.creamer}% water`);
   if (o.mode) parts.push(o.mode === "ml" ? "🤖" : "picky");
-  const dir = o.feedback?.creamer;
-  if (dir !== undefined) parts.push(["wants more tea", "perfect", "wants more creamer"][dir + 1]);
+  const fb = o.feedback || {};
+  if (fb.tea !== undefined) parts.push(["wants weaker", "strength perfect", "wants stronger"][fb.tea + 1]);
+  if (fb.creamer !== undefined) parts.push(["wants less creamy", "creaminess perfect", "wants creamier"][fb.creamer + 1]);
   return parts.join(" · ");
 }
 

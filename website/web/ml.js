@@ -16,14 +16,23 @@
 //
 // No Firebase imports here, so tools/simulate.mjs can run it in Node.
 
-// One entry per thing the machine can vary. Add a knob when you add a pump.
-// min/max bound what the model may try; picky orders can use 0–100.
+// One entry per thing the machine can vary, each a % of the cup. Water fills
+// whatever tea and creamer leave, so tea % is how strong the drink is and
+// creamer % how creamy (and sweet: the creamer is sweetened) it is.
+// min/max bound what the model may try. They add up to at most 100 so the
+// model can never ask for more than a full cup; picky orders can use 0–100
+// as long as the total stays at 100 (index.html enforces that).
 // less/more label the "which way?" buttons on the rating page.
 export const KNOBS = [
   {
-    key: "creamer", label: "Creamer", min: 5, max: 60, default: 30,
-    less: "More tea", more: "More creamer",
-    describe: (v) => `${v}% creamer · ${100 - v}% tea`,
+    key: "tea", label: "Tea", min: 15, max: 60, default: 35,
+    less: "Weaker", more: "Stronger",
+    describe: (v) => `${v}%`,
+  },
+  {
+    key: "creamer", label: "Sweet creamer", min: 5, max: 40, default: 25,
+    less: "Less creamy", more: "Creamier",
+    describe: (v) => `${v}%`,
   },
 ];
 
@@ -213,7 +222,7 @@ export function forDrinker(model, id) {
   };
 }
 
-// Predicted stars for a recipe like { creamer: 30 }.
+// Predicted stars for a recipe like { tea: 35, creamer: 25 }.
 export function predict(model, recipe) {
   return predictNorm(model.w, KNOBS.map((k) => norm(k, recipe[k.key])));
 }

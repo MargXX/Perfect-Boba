@@ -4,7 +4,7 @@ The ordering + rating web app for Perfect Boba. Built on Firebase (Hosting + Fir
 
 ## What it does
 
-- `/` — guests scan a QR on the machine, enter a name, how many liquid oz they want (8/12/16/20) and tapioca on/off, then either tap **🤖 Order now** (the model picks the creamer:tea mix) or **I'm picky** (set the mix yourself). Shows the total order count, and for returning guests "You've had N cups · #K on the leaderboard". It never shows what an **Order now** cup will be; that's meant to be a surprise.
+- `/` — guests scan a QR on the machine, enter a name, how many liquid oz they want (8/12/16/20) and the tea, then either tap **🤖 Order now** (the model picks the mix) or **I'm picky** (set the mix yourself). Shows the total order count, and for returning guests "You've had N cups · #K on the leaderboard". It never shows what an **Order now** cup will be; that's meant to be a surprise.
 - `/queue` — live queue position, status pill, browser push + audio ding when it's your turn, auto-redirects to rate when done
 - `/rate/:id` — 1–5 stars after drinking, plus an optional "More tea / Perfect / More creamer"; trains the recipe model
 - `/leaderboard` — cups made per person (only orders that reached `done` count, so spamming orders doesn't help). People are grouped by their phone ID and shown under their latest name; no login needed.
@@ -29,12 +29,13 @@ Guests (any internet)  ──→  Firebase Hosting + Firestore
   drinker_id: string                     # random ID saved on the guest's phone; ties their ratings together
   mode: "ml" | "picky"
   size_oz: 8 | 12 | 16 | 20             # liquid fl oz chosen by the guest
-  recipe: { creamer: 0–100 (% of the drink; the rest is tea), volume_ml: int (size_oz in ml, for the pumps), tapioca: bool }
+  recipe: { tea: 0–100, creamer: 0–100 (% of the drink; water fills the rest, tea + creamer ≤ 100),
+            tea_type: "black" (TEAS in web/app.js), volume_ml: int (size_oz in ml, for the pumps) }
   model: { n, n_mine, best, predicted } | null  # what the model knew when it picked an "ml" recipe
   status: queued | awaiting_cup | dispensing | done | cancelled | error
   created_at: timestamp (server)
   rating: int | null                     # 1–5, set once after status is done
-  feedback: { creamer: -1 | 0 | 1 }      # optional, with the rating: more tea / perfect / more creamer
+  feedback: { tea: -1|0|1, creamer: -1|0|1 }   # optional, with the rating: weaker/perfect/stronger, less creamy/perfect/creamier
 
 /people/{drinker_id}                      # dev edits to the leaderboard; orders are never rewritten
   bonus: int                               # cups to add (or take away, if negative)
@@ -118,13 +119,13 @@ The dev page only writes a request; the ESP32 carries it out. When it sees `/mac
 
 ## How the recipe learns
 
-With two pumps (creamer and tea), a recipe is one number: the creamer %. `web/ml.js` learns it from ratings, separately for each person:
+A recipe is two numbers: tea % (how strong) and sweetened creamer % (how creamy and sweet). Water fills the rest of the cup. `web/ml.js` learns them from ratings, separately for each person:
 
-1. **Fit.** Every rated order (picky ones too) is a data point: creamer % → stars, plus the optional "more tea / perfect / more creamer". Gradient descent fits one curve for the whole group and a small correction for each person at the same time. Both start from a gentle guess that peaks at 30%, so a few ratings can't swing it far.
+1. **Fit.** Every rated order (picky ones too) is a data point: tea % and creamer % → stars, plus the optional "weaker / perfect / stronger" and "less creamy / perfect / creamier". Gradient descent fits one curve for the whole group and a small correction for each person at the same time. Both start from a gentle guess that peaks at 35% tea and 25% creamer, so a few ratings can't swing it far. Orders from before the tea knob existed (creamer only) are skipped.
    - Your cup = group curve + your correction. Your correction starts at zero, so a newcomer gets the group's best cup, and since it sits on top of the *live* group curve, you keep benefiting as the group curve improves.
    - The correction's constant term learns whether you rate generously or harshly, so both kinds of rater are useful.
-   - "More creamer" tells the model which way your curve slopes at that cup. That points straight at a better cup, so it learns far faster than from stars alone.
-2. **Climb.** Gradient ascent on your curve finds the creamer % it predicts you'll rate highest, kept within 5–60% and at most ~8% away from your last cup (a few answers say which way, not how far).
+   - "Creamier" tells the model which way your curve slopes at that cup. That points straight at a better cup, so it learns far faster than from stars alone.
+2. **Climb.** Gradient ascent on your curve finds the mix it predicts you'll rate highest, kept within tea 15–60% and creamer 5–40% (so never over a full cup) and within ~15% of each range from your last cup (a few answers say which way, not how far).
 3. **Explore.** An **Order now** cup gets that best guess plus a random wiggle, so the model keeps learning. The wiggle shrinks as ratings pile up, overall and for you.
 
 People are recognised by a random ID saved on their phone, not by name, so lazy or duplicate names don't matter. The name box is remembered too. A new phone or cleared browser data means starting over as a newcomer.

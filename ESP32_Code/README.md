@@ -77,11 +77,11 @@ After changing anything in `lib/` or `apps/`, run `./install.sh …` again to up
 No internet and no Firebase: the ESP32 makes its own WiFi network and serves the same pages as https://perfect-boba-bot.web.app, with orders saved on its flash. Only phones on the BobaBot WiFi can order, so nobody can order from home.
 
 1. Add `DEV_PASSCODE = "..."` to `wifi_config.py` (see `wifi_config_example.py`). It unlocks `/dev` and `/pumps`.
-2. Set `ML_PER_SECOND` at the top of `apps/boba_server.py` (pump 1 = tea, pump 2 = creamer, pump 3 = water if fitted). To measure a pump: on `/pumps`, tap **Start**, tap **Stop** when it has poured a known amount (1 qt = 946 ml), and divide the ml by the **Last run** seconds it shows.
+2. Set `NUM_PUMPS` (how many are fitted) and `ML_PER_SECOND` at the top of `apps/boba_server.py` (pump 1 = tea, 2 = sweetened creamer, 3 = water, 4 = a second tea). The Arduino sketch drives servos 1–2 only, so pumps 3–4 also need their servo pins added there. To measure a pump: on `/pumps`, tap **Start**, tap **Stop** when it has poured a known amount (1 qt = 946 ml), and divide the ml by the **Last run** seconds it shows.
 3. Make sure both pumps are **off**, then `./run.sh apps/boba_server.py`, or `./install.sh apps/boba_server.py` to run it from the wall. Both copy the website to the board first.
 4. Guests join the BobaBot WiFi and open **http://192.168.4.1**.
 
-How an order goes: guest orders → it waits in the queue → when it's their turn their phone says so (status `awaiting_cup`) → they put a cup under the spout and tap **My cup is in — pour!** → the machine runs creamer and tea for `volume_ml × creamer %` and the rest → `done`, and their phone asks for a rating. Tapioca is added by hand.
+How an order goes: guest orders → it waits in the queue → when it's their turn their phone says so (status `awaiting_cup`) → they put a cup under the spout and tap **My cup is in — pour!** → the machine runs tea for `volume_ml × tea %`, creamer for `volume_ml × creamer %`, and water for the rest → `done`, and their phone asks for a rating. Pumps above `NUM_PUMPS` are skipped, so until the water pump is fitted, cups come out short by their water share.
 
 - **Spam limits:** each phone can have one cup in the queue at a time (checked by its phone ID and its WiFi address), and the queue holds at most 20 (`MAX_QUEUE`). Guests can cancel while queued or when called up; the dev page can do anything.
 - **Dev tools:** `/dev` works as on the website (pause, Clean, mark done, cancel, delete, leaderboard edits), plus a **Manual pump control** link to `/pumps`.
