@@ -27,7 +27,7 @@ button { flex:1; font-size:17px; padding:12px; border-radius:10px; border:0; cur
 #msg { color:var(--muted); font-size:14px; min-height:20px; }
 </style></head><body>
 <h1>Boba Pumps</h1>
-<p class="fix" style="margin-top:-8px">Pump 1 = creamer, pump 2 = tea (set in boba_server.py).
+<p class="fix" style="margin-top:-8px">Pump 1 = tea, pump 2 = creamer (set in boba_server.py).
   <a href="/dev">← Dev page</a></p>
 <div id="pumps"></div>
 <div class="card">
@@ -55,6 +55,10 @@ for (let i = 1; i <= N; i++) {
       <button class="go" onclick="run(${i})">Run</button>
       <button class="stop" onclick="api('stop?pump=${i}')">Stop</button>
     </div>
+    <div class="row" style="margin-top:8px">
+      <button class="go" onclick="api('start?pump=${i}')">Start (run until Stop)</button>
+    </div>
+    <div class="fix" id="last${i}"></div>
     <div class="fix">Out of sync? It's actually
       <a href="#" onclick="api('fix?pump=${i}&on=1');return false">on</a>
       <a href="#" onclick="api('fix?pump=${i}&on=0');return false">off</a></div>
@@ -65,8 +69,11 @@ let error = "";
 function show(st) {
   st.pumps.forEach((p, k) => {
     const el = document.getElementById("s" + (k + 1));
-    el.textContent = p.on ? (p.remaining != null ? `ON · ${p.remaining.toFixed(1)} s left` : "ON") : "OFF";
+    const ran = p.elapsed != null ? ` · ${p.elapsed.toFixed(1)} s` : "";
+    el.textContent = p.on ? `ON${ran}` + (p.remaining != null ? ` · ${p.remaining.toFixed(1)} s left` : "") : "OFF";
     el.className = "state" + (p.on ? " on" : "");
+    document.getElementById("last" + (k + 1)).textContent =
+      p.last_run != null ? `Last run: ${p.last_run.toFixed(1)} s (on press to off press)` : "";
   });
   msg.textContent = error || (st.busy ? "Pressing button…" : "");
 }

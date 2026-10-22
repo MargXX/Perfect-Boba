@@ -9,6 +9,9 @@ class _Pump:
         self.servo = servo
         self.is_on = False
         self.stop_at = None  # ticks_ms when a timed run should end
+        self.timed = True    # False for Start (run until Stop)
+        self.on_at = None    # ticks_ms when the "on" press was sent
+        self.last_run = None # seconds between the last on and off presses
 
 
 class PumpControl:
@@ -40,13 +43,20 @@ class PumpControl:
         p = self.pump(n)
         async with self.lock:
             if p.is_on != on:
+                # Time from press to press, so the servo's delay cancels out.
+                if on:
+                    p.on_at = time.ticks_ms()
+                elif p.on_at is not None:
+                    p.last_run = time.ticks_diff(time.ticks_ms(), p.on_at) / 1000
                 self.presser.press(p.servo)
                 await asyncio.sleep(PRESS_SECONDS)
                 p.is_on = on
         self._show()
 
-    async def run_for(self, n, seconds):
-        """Turn pump n on; timer_loop() turns it off after `seconds`."""
+    async def run_for(self, n, seconds, timed=True):
+        """Turn pump n on; timer_loop() turns it off after `seconds`.
+        timed=False marks it as run-until-Stop (`seconds` is only a safety limit)."""
+        self.pump(n).timed = timed
         await self.set_on(n, True)
         # Start the clock once the pump is actually on, so it runs the full time.
         self.pump(n).stop_at = time.ticks_add(time.ticks_ms(), int(seconds * 1000))
@@ -88,8 +98,10 @@ class PumpControl:
     def status(self):
         out = []
         for p in self.pumps:
-            left = None
-            if p.stop_at is not None:
+            left = elapsed = None
+            if p.stop_at is not None and p.timed:
                 left = max(0, time.ticks_diff(p.stop_at, time.ticks_ms())) / 1000
-            out.append({"on": p.is_on, "remaining": left})
+            if p.is_on and p.on_at is not None:
+                elapsed = time.ticks_diff(time.ticks_ms(), p.on_at) / 1000
+            out.append({"on": p.is_on, "remaining": left, "elapsed": elapsed, "last_run": p.last_run})
         return {"pumps": out, "busy": self.lock.locked()}

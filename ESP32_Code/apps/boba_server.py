@@ -35,17 +35,19 @@ from button import ButtonPresser
 from pump_control import PumpControl
 from store import Store
 
-# Which servo presses which pump's button.
-CREAMER_PUMP = 1
-TEA_PUMP = 2
+# Which servo presses which pump's button. Pump 3 (water, not fitted yet) isn't used for orders.
+TEA_PUMP = 1
+CREAMER_PUMP = 2
+WATER_PUMP = 3
 # How much each pump moves, in ml per second. These are guesses: on /pumps,
 # run a pump for 10 s into a measuring cup and divide the ml by 10.
-ML_PER_SECOND = {CREAMER_PUMP: 10.0, TEA_PUMP: 10.0}
+ML_PER_SECOND = {TEA_PUMP: 10.0, CREAMER_PUMP: 10.0}
 
 NUM_PUMPS = 2
 MAX_QUEUE = 20          # orders waiting at once
 MAX_VOLUME_ML = 700
-MAX_SECONDS = 120       # one manual pump run on /pumps
+MAX_SECONDS = 120       # one timed pump run on /pumps
+START_MAX_SECONDS = 600 # Start on /pumps (run until Stop) gives up after this long
 CLEAN_MAX_SECONDS = 300
 STARTUP_SECONDS = 3     # when everything powers on together, give the Uno time to boot
 WWW = "/www"            # the website's files (install.sh / run.sh copy them here)
@@ -347,6 +349,8 @@ def pump_action(action, params):
         if not 0 < seconds <= MAX_SECONDS:
             raise Denied("seconds must be between 0 and %d" % MAX_SECONDS)
         asyncio.create_task(pumps.run_for(n, seconds))
+    elif action == "start":
+        asyncio.create_task(pumps.run_for(n, START_MAX_SECONDS, timed=False))
     elif action == "stop":
         asyncio.create_task(pumps.stop(n))
     elif action == "fix":
