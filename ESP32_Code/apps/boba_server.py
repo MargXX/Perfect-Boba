@@ -39,9 +39,9 @@ from store import Store
 TEA_PUMP = 1
 CREAMER_PUMP = 2
 WATER_PUMP = 3
-# How much each pump moves, in ml per second. These are guesses: on /pumps,
-# run a pump for 10 s into a measuring cup and divide the ml by 10.
-ML_PER_SECOND = {TEA_PUMP: 10.0, CREAMER_PUMP: 10.0}
+# How much each pump moves, in ml per second. Measured 2026-10-21: a quart
+# (946 ml) took 40–42 s, so ~23 ml/s. To re-measure: Start/Stop on /pumps.
+ML_PER_SECOND = {TEA_PUMP: 23.0, CREAMER_PUMP: 23.0}
 
 NUM_PUMPS = 2
 MAX_QUEUE = 20          # orders waiting at once
