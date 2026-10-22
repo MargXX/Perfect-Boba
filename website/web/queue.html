@@ -26,6 +26,7 @@
     </p>
     <div id="claim-banner" class="flash-big" hidden>
       It's your turn — place your cup in the machine.
+      <button id="pour" style="margin-top:12px">My cup is in — pour!</button>
     </div>
     <button id="cancel" class="secondary" style="margin-top:16px">Cancel order</button>
   </div>
@@ -39,9 +40,8 @@
 <script type="module">
 import {
   ORDERS, MACHINE_STATE, doc, getDoc, updateDoc, onSnapshot, query, where, orderBy,
-  getOrderId, machineOnline, ding, db, escapeHtml
+  getOrderId, machineOnline, ding, db, escapeHtml, collection
 } from "/app.js";
-import { collection } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const myId = getOrderId();
 if (!myId) {
@@ -64,6 +64,9 @@ if (!myId) {
     pill.textContent = d.status.replace("_", " ");
     pill.className = "status-pill " + d.status;
     document.getElementById("claim-banner").hidden = d.status !== "awaiting_cup";
+    const pour = document.getElementById("pour");
+    pour.disabled = !!d.cup_ready;
+    pour.textContent = d.cup_ready ? "Pouring soon…" : "My cup is in — pour!";
 
     if (d.status === "awaiting_cup" && !notified) {
       notified = true; ding();
@@ -75,6 +78,13 @@ if (!myId) {
       location.href = "/rate/" + myId;
     }
     lastStatus = d.status;
+  });
+
+  // The machine waits for this before it pours.
+  document.getElementById("pour").addEventListener("click", async (e) => {
+    e.target.disabled = true;
+    try { await updateDoc(doc(db, "orders", myId), { cup_ready: true }); }
+    catch (err) { alert(err.message); e.target.disabled = false; }
   });
 
   document.getElementById("cancel").addEventListener("click", async () => {

@@ -4,3 +4,6 @@
 # Join it from your phone, then open http://192.168.4.1
 AP_SSID = "BobaBot"
 AP_PASSWORD = "change-me-please"  # at least 8 characters
+
+# Passcode for /dev and /pumps on the ESP32's own website (apps/boba_server.py).
+DEV_PASSCODE = "change-me-too"

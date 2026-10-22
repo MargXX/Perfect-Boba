@@ -9,8 +9,12 @@ ESP32_Code/
 ├── lib/                    Libraries the programs import (installed to /lib on the board)
 │   ├── button.py             Sends PRESS / ANGLE commands to the Uno over UART
 │   ├── pumps.py              Pump class: tracks each toggle pump's on/off state
+│   ├── pump_control.py       The same for asyncio programs (boba_server.py)
+│   ├── store.py              Orders and leaderboard edits saved on the board's flash
+│   ├── captive_dns.py        Answers every DNS lookup so phones stay on BobaBot
 │   └── servo.py              Drives a servo straight from an ESP32 pin (PWM)
 ├── apps/                   Programs that run the machine (one becomes the board's main.py)
+│   ├── boba_server.py        The whole ordering website, served by the ESP32 itself
 │   ├── pump_server.py        Phone control page over the ESP32's own WiFi
 │   └── gpio_recipe.py        Early prototype: recipe on pumps wired directly to GPIO pins
 ├── tests/                  Hardware test scripts
@@ -19,7 +23,11 @@ ESP32_Code/
 │   ├── button_test.py        Presses servo 1 three times
 │   ├── pin_finder.py         Sweeps a servo on each GPIO to find which pin it's on
 │   └── servo_test.py         Drives a servo directly from the ESP32 (no Uno)
+├── web/                    ESP32-only website files, added on top of ../website/web
+│   ├── firebase.js           Stand-in for Firebase that talks to boba_server.py
+│   └── pumps.html            Manual pump control (the old pump_server page)
 ├── tools/                  Mac-side helpers used by the scripts (never copied to the board)
+│   ├── build_www.sh          Builds www/ (the website the board serves; gitignored)
 │   ├── esp32_port.sh         Finds the ESP32's serial port
 │   └── hard_reset.py         Resets the ESP32 over USB and waits for it to boot
 ├── run.sh                  Run a script on the board without installing it
@@ -30,7 +38,7 @@ ESP32_Code/
 └── pyrightconfig.json      Editor settings so VS Code understands MicroPython + lib/
 ```
 
-On the board, an installed setup looks like `/main.py` (the program), `/wifi_config.py` and `/lib/*.py`. MicroPython searches `/lib` for imports automatically.
+On the board, an installed setup looks like `/main.py` (the program), `/wifi_config.py` and `/lib/*.py`, plus `/www` (the website) and `/data` (saved orders) for `boba_server.py`. MicroPython searches `/lib` for imports automatically.
 
 ## One-time setup
 
@@ -63,6 +71,23 @@ If it can't connect, hold the **BOOT** button while it connects.
 `run.sh` and `install.sh` hard-reset the board first, so a run that was interrupted can't leave it stuck. All the scripts connect to the ESP32's port explicitly. Otherwise mpremote can pick the Uno instead when both are plugged in.
 
 After changing anything in `lib/` or `apps/`, run `./install.sh …` again to update the board. `run.sh` always uses the current files on the Mac.
+
+## The whole website on the ESP32 (`apps/boba_server.py`)
+
+No internet and no Firebase: the ESP32 makes its own WiFi network and serves the same pages as https://perfect-boba-bot.web.app, with orders saved on its flash. Only phones on the BobaBot WiFi can order, so nobody can order from home.
+
+1. Add `DEV_PASSCODE = "..."` to `wifi_config.py` (see `wifi_config_example.py`). It unlocks `/dev` and `/pumps`.
+2. Set `CREAMER_PUMP`, `TEA_PUMP` and `ML_PER_SECOND` at the top of `apps/boba_server.py`. To measure a pump: on `/pumps`, run it for 10 s into a measuring cup and divide the ml by 10.
+3. Make sure both pumps are **off**, then `./run.sh apps/boba_server.py`, or `./install.sh apps/boba_server.py` to run it from the wall. Both copy the website to the board first.
+4. Guests join the BobaBot WiFi and open **http://192.168.4.1**.
+
+How an order goes: guest orders → it waits in the queue → when it's their turn their phone says so (status `awaiting_cup`) → they put a cup under the spout and tap **My cup is in — pour!** → the machine runs creamer and tea for `volume_ml × creamer %` and the rest → `done`, and their phone asks for a rating. Tapioca is added by hand.
+
+- **Spam limits:** each phone can have one cup in the queue at a time (checked by its phone ID and its WiFi address), and the queue holds at most 20 (`MAX_QUEUE`). Guests can cancel while queued or when called up; the dev page can do anything.
+- **Dev tools:** `/dev` works as on the website (pause, Clean, mark done, cancel, delete, leaderboard edits), plus a **Manual pump control** link to `/pumps`.
+- **Data:** orders are in `/data/orders/*.json` (16 per file), leaderboard edits in `/data/people.json`. They survive restarts and reinstalls. A cup that was pouring during a power cut is marked `error`.
+- **Clock:** the ESP32 takes the time from the first phone that connects, since it has no internet.
+- **How the pages are shared:** `tools/build_www.sh` copies `../website/web` and then `web/` on top, so the ESP32 gets its own `firebase.js`. That file has the same exports as the real one, but each phone keeps a copy of the data, checks `/api/poll` every second, and re-downloads only changed files. The rules in `boba_server.py` match `../website/firestore.rules`.
 
 ## Phone control over WiFi (`apps/pump_server.py`)
 

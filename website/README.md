@@ -58,7 +58,7 @@ Rules in `firestore.rules`:
 
 The dev passcode is the password of the `dev@bobabot.local` auth user, so it's checked by Firebase, not stored in the site's code. Both passwords are kept in `SECRETS.md` at the repo root, which is gitignored. Never commit them; the repo is public.
 
-The web-app Firebase API key is published in `web/app.js` — this is expected. Firebase security is enforced by rules, not by hiding the key.
+The web-app Firebase API key is published in `web/firebase.js` — this is expected. Firebase security is enforced by rules, not by hiding the key.
 
 ## Layout
 
@@ -71,7 +71,8 @@ website/
 │   ├── admin.html              # operator view
 │   ├── dev.html                # passcode-locked dev tools
 │   ├── leaderboard.html        # cups made per person
-│   ├── app.js                  # shared Firebase init + helpers
+│   ├── firebase.js             # Firebase init (the ESP32 swaps in its own; see ESP32_Code/web/)
+│   ├── app.js                  # shared helpers
 │   ├── ml.js                   # recipe model (no Firebase; runs in browser and Node)
 │   └── style.css
 ├── firebase.json               # hosting + firestore config
@@ -91,7 +92,7 @@ You only need this to rebuild the site in a new Firebase project. The current on
 Tools: Node (`brew install node`) and the Firebase CLI (`npm install -g firebase-tools`, then `firebase login`).
 
 1. **Project**: `firebase projects:create <id>`, then put the id in `website/.firebaserc` (gitignored): `{"projects": {"default": "<id>"}}`
-2. **Web config**: `firebase apps:create web "BobaBot web"`, then paste the output of `firebase apps:sdkconfig web` into `firebaseConfig` in `web/app.js`
+2. **Web config**: `firebase apps:create web "BobaBot web"`, then paste the output of `firebase apps:sdkconfig web` into `firebaseConfig` in `web/firebase.js`
 3. **Database**: enable the Cloud Firestore API in the Google Cloud console, then `firebase firestore:databases:create "(default)" --location nam5`
 4. **Deploy**: from `website/`, `firebase deploy --only firestore,hosting` (rules can take a minute to take effect)
 5. **Logins**: in the Firebase console → Authentication, enable Email/Password, then add `dev@bobabot.local` (password = dev passcode) and `machine@bobabot.local`. Do this right after deploying so nobody else can register those emails first.

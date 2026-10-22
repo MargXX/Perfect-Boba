@@ -1,30 +1,11 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
-  getFirestore, collection, addDoc, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, writeBatch,
-  onSnapshot, query, where, orderBy, limit, serverTimestamp, getCountFromServer
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import {
-  initializeAuth, browserLocalPersistence, browserSessionPersistence,
+  db, auth, collection, addDoc, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, writeBatch,
+  onSnapshot, query, where, orderBy, limit, serverTimestamp, getCountFromServer,
   signInWithEmailAndPassword, signOut, onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+} from "/firebase.js";
 import { learn } from "/ml.js";
 
-export const firebaseConfig = {
-  apiKey: "AIzaSyBG7V9FVRsqaenN9nBJ1PossDsXbKR_0b8",
-  authDomain: "perfect-boba-bot.firebaseapp.com",
-  projectId: "perfect-boba-bot",
-  storageBucket: "perfect-boba-bot.firebasestorage.app",
-  messagingSenderId: "686342659061",
-  appId: "1:686342659061:web:bd4ac0bf51618821da5ebc"
-};
-
-const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
-// Not getAuth(): its IndexedDB storage never finished starting up in Chrome,
-// so the dev page never learned whether you were signed in.
-export const auth = initializeAuth(app, {
-  persistence: [browserLocalPersistence, browserSessionPersistence],
-});
+export { db, auth };
 
 export const ORDERS = collection(db, "orders");
 export const MACHINE_STATE = doc(db, "machine", "state");
@@ -39,7 +20,7 @@ export const ozToMl = (oz) => Math.round(oz * 29.5735);
 export const DEV_EMAIL = "dev@bobabot.local";
 
 export {
-  addDoc, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, writeBatch, onSnapshot, query, where,
+  collection, addDoc, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, writeBatch, onSnapshot, query, where,
   orderBy, limit, serverTimestamp, signInWithEmailAndPassword, signOut, onAuthStateChanged
 };
 

@@ -10,7 +10,7 @@ service cloud.firestore {
                          ["name", "drinker_id", "mode", "size_oz", "recipe", "model", "status", "created_at", "rating"])
                     && request.resource.data.mode in ["ml", "picky"]
                     && request.resource.data.rating == null;
-      allow update: if isMachine() || isDev() || rating() || cancelling();
+      allow update: if isMachine() || isDev() || rating() || cancelling() || cupReady();
       allow delete: if isDev();
     }
 
@@ -42,6 +42,13 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status"])
           && resource.data.status == "queued"
           && request.resource.data.status == "cancelled";
+    }
+
+    // The guest says their cup is under the spout, so the machine can pour.
+    function cupReady() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(["cup_ready"])
+          && resource.data.status == "awaiting_cup"
+          && request.resource.data.cup_ready == true;
     }
 
     // Signing in as these emails needs their password, so the email is enough.

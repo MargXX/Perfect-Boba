@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Install a program on the ESP32 so it runs by itself at power-up (no Mac needed).
-# Copies lib/*.py to /lib on the board, wifi_config.py to /, and the program as /main.py.
+# Copies lib/*.py to /lib on the board, wifi_config.py to /, the website to /www
+# (for programs that serve it), and the program as /main.py.
 # Usage: ./install.sh apps/pump_server.py
 #        ./install.sh --remove          (delete main.py so nothing runs at power-up)
 set -euo pipefail
@@ -37,6 +38,14 @@ for f in lib/*.py; do
 done
 if [ -f wifi_config.py ]; then
   args+=(+ cp wifi_config.py :wifi_config.py)
+fi
+# Programs that serve the website (boba_server.py) read it from /www.
+if grep -q '"/www"' "$1"; then
+  tools/build_www.sh
+  args+=(+ exec "import os; 'www' in os.listdir('/') or os.mkdir('/www')")
+  for f in www/*; do
+    args+=(+ cp "$f" ":/www/$(basename "$f")")
+  done
 fi
 args+=(+ cp "$1" :main.py + reset)
 

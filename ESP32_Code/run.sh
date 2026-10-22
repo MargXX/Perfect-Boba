@@ -20,6 +20,18 @@ fi
 # hung and refuse to connect ("could not enter raw repl").
 .venv/bin/python tools/hard_reset.py
 
+# Programs that serve the website (boba_server.py) read it from /www on the
+# board's own flash (reading it through the mount below is far too slow).
+# mpremote skips files that haven't changed.
+if grep -q '"/www"' "$1"; then
+  tools/build_www.sh
+  args=(exec "import os; 'www' in os.listdir('/') or os.mkdir('/www')")
+  for f in www/*; do
+    args+=(+ cp "$f" ":/www/$(basename "$f")")
+  done
+  $MP "${args[@]}"
+fi
+
 # "mount ." makes this folder appear on the board as /remote (the working
 # directory), so wifi_config.py and lib/ are used straight from the Mac.
 # The script gets a one-line prefix that puts /remote/lib first on the import

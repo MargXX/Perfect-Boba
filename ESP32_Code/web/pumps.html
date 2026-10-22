@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Boba Pumps</title>
+<style>
+:root { --bg:#faf7f2; --card:#fff; --text:#2b2118; --muted:#7a6a5c; --accent:#8a5a2b; --on:#2f8f4e; --line:#e6ddd2; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1b1612; --card:#26201a; --text:#f3ebe2; --muted:#b3a393; --accent:#d9a066; --on:#5cc27d; --line:#3a3128; }
+}
+* { box-sizing: border-box; }
+body { margin:0; padding:16px; background:var(--bg); color:var(--text);
+       font:16px/1.4 -apple-system, system-ui, sans-serif; }
+h1 { font-size:22px; margin:4px 0 16px; }
+.card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:14px; }
+.head { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+.name { font-weight:600; font-size:18px; }
+.state { font-weight:600; color:var(--muted); }
+.state.on { color:var(--on); }
+.row { display:flex; gap:8px; align-items:center; }
+input { width:90px; font-size:18px; padding:10px; border-radius:10px; border:1px solid var(--line);
+        background:var(--bg); color:var(--text); }
+button { flex:1; font-size:17px; padding:12px; border-radius:10px; border:0; cursor:pointer; }
+.go { background:var(--accent); color:#fff; }
+.stop { background:var(--line); color:var(--text); }
+.fix { margin-top:10px; font-size:13px; color:var(--muted); }
+.fix a, a { color:var(--muted); margin-left:6px; }
+#msg { color:var(--muted); font-size:14px; min-height:20px; }
+</style></head><body>
+<h1>Boba Pumps</h1>
+<p class="fix" style="margin-top:-8px">Pump 1 = creamer, pump 2 = tea (set in boba_server.py).
+  <a href="/dev">← Dev page</a></p>
+<div id="pumps"></div>
+<div class="card">
+  <div class="head"><span class="name">Clean</span></div>
+  <p class="fix" style="margin-top:0">Put both intake tubes in hot water and a cup under the spout.
+    Runs both pumps, then turns them off.</p>
+  <div class="row">
+    <input id="clean-t" type="number" inputmode="decimal" min="1" max="300" step="1" value="30"> s
+    <button class="go" onclick="clean()">Clean</button>
+    <button class="stop" onclick="api('stop_all')">Stop both</button>
+  </div>
+</div>
+<div id="msg"></div>
+<script>
+// Manual control, for testing and measuring each pump's ml per second.
+// Needs the dev sign-in from /dev (its token is kept on this phone).
+const N = 2;
+const box = document.getElementById("pumps");
+for (let i = 1; i <= N; i++) {
+  box.insertAdjacentHTML("beforeend", `
+  <div class="card">
+    <div class="head"><span class="name">Pump ${i}</span><span class="state" id="s${i}">…</span></div>
+    <div class="row">
+      <input id="t${i}" type="number" inputmode="decimal" min="0.5" max="120" step="0.5" value="5"> s
+      <button class="go" onclick="run(${i})">Run</button>
+      <button class="stop" onclick="api('stop?pump=${i}')">Stop</button>
+    </div>
+    <div class="fix">Out of sync? It's actually
+      <a href="#" onclick="api('fix?pump=${i}&on=1');return false">on</a>
+      <a href="#" onclick="api('fix?pump=${i}&on=0');return false">off</a></div>
+  </div>`);
+}
+const msg = document.getElementById("msg");
+let error = "";
+function show(st) {
+  st.pumps.forEach((p, k) => {
+    const el = document.getElementById("s" + (k + 1));
+    el.textContent = p.on ? (p.remaining != null ? `ON · ${p.remaining.toFixed(1)} s left` : "ON") : "OFF";
+    el.className = "state" + (p.on ? " on" : "");
+  });
+  msg.textContent = error || (st.busy ? "Pressing button…" : "");
+}
+async function api(action) {
+  try {
+    const r = await fetch("/api/pumps/" + action, { headers: { "X-Token": localStorage.getItem("devToken") || "" } });
+    const st = await r.json();
+    if (st.error) { msg.textContent = st.error; error = st.error; setTimeout(() => error = "", 4000); }
+    else show(st);
+  } catch (e) { msg.textContent = "Can't reach the machine. Still on the BobaBot WiFi?"; }
+}
+function clean() {
+  if (!confirm("Both intake tubes in hot water and a cup under the spout?")) return;
+  api(`clean?seconds=${document.getElementById("clean-t").value}`);
+}
+function run(i) { api(`run?pump=${i}&seconds=${document.getElementById("t" + i).value}`); }
+api("status");
+setInterval(() => api("status"), 1000);
+</script></body></html>
