@@ -117,10 +117,11 @@ countOrders()
 
 // Learn from all ratings once on load; fall back to the default recipe.
 const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
-const modelReady = loadModel()
-  .catch((err) => { console.warn(err); return learn([]); })
-  .then(async (m) => forDrinker(m, await meReady));
-modelReady.then((m) => {
+// The model gives each tea its own best cup, so pick for the chosen tea.
+const selectedTea = () => document.querySelector("input[name=tea]:checked").value;
+const groupModel = loadModel().catch((err) => { console.warn(err); return learn([]); });
+const modelFor = async (tea) => forDrinker(await groupModel, await meReady, tea);
+modelFor(selectedTea()).then((m) => {
   const hint = document.getElementById("ml-hint");
   // Never reveal the recipe: "Order now" cups are meant to be a mystery.
   if (m.nMine) hint.textContent =
@@ -143,7 +144,7 @@ document.getElementById("order-form").addEventListener("submit", async (e) => {
     const sizeOz = Number(document.querySelector("input[name=size]:checked").value);
     let mix, model = null;
     if (mode === "ml") {
-      const m = await modelReady;
+      const m = await modelFor(selectedTea());
       mix = pickRecipe(m);
       model = { n: m.n, n_mine: m.nMine, best: m.best, predicted: m.predicted };
     } else {

@@ -1,9 +1,11 @@
 // Watch the recipe model learn from pretend friends, no Firebase needed.
 // Each friend has their own favorite tea % and creamer %, rates a bit high or
-// low, and (if feedback is on) says which way for each. Compares:
+// low, and (if feedback is on) says which way for each. There are two teas,
+// and everyone likes 15 points more of the second one. Compares:
 //   group       one best cup for everyone
 //   personal    a correction per person on top of the group curve
 //   +direction  personal, plus the "which way?" answers
+//   +per tea    that, plus a correction per tea
 // Usage:
 //   node tools/simulate.mjs            # 8 friends, 80 cups
 //   node tools/simulate.mjs 12 150     # 12 friends, 150 cups
@@ -35,9 +37,10 @@ function run(options, seed) {
   const misses = [];
   for (let i = 0; i < CUPS; i++) {
     const f = friends[Math.floor(r() * FRIENDS)];
-    const model = forDrinker(learn(orders, options), f.id);
-    const recipe = pickRecipe(model, r);
-    const offTea = recipe.tea - f.tea, offCreamer = recipe.creamer - f.creamer;
+    const tea = r() < 0.5 ? "thai" : "jasmine";
+    const model = forDrinker(learn(orders, options), f.id, tea);
+    const recipe = { ...pickRecipe(model, r), tea_type: tea };
+    const offTea = recipe.tea - (f.tea + (tea === "jasmine" ? 15 : 0)), offCreamer = recipe.creamer - f.creamer;
     const stars = Math.round(5 - 0.004 * (offTea ** 2 + offCreamer ** 2) + f.bias + 0.5 * gauss());
     const dir = (off) => (Math.abs(off) < 4 ? 0 : off > 0 ? -1 : 1);
     const feedback = { tea: dir(offTea), creamer: dir(offCreamer) };
@@ -48,9 +51,10 @@ function run(options, seed) {
 }
 
 const versions = {
-  "group": { personal: false, feedback: false },
-  "personal": { personal: true, feedback: false },
-  "+direction": { personal: true, feedback: true },
+  "group": { personal: false, feedback: false, perTea: false },
+  "personal": { personal: true, feedback: false, perTea: false },
+  "+direction": { personal: true, feedback: true, perTea: false },
+  "+per tea": { personal: true, feedback: true, perTea: true },
 };
 console.log(`${FRIENDS} friends, ${CUPS} cups, ${TRIALS} trials.`);
 console.log("Average distance from each person's favorite over the second half of cups:");

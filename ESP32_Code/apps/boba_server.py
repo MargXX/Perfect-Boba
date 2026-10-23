@@ -45,8 +45,10 @@ WATER_PUMP = 3
 # the water pump is fitted cups come out short by their water share.
 NUM_PUMPS = 2
 # How much each pump moves, in ml per second. Measured 2026-10-21: a quart
-# (946 ml) took 40–42 s, so ~23 ml/s. To re-measure: Start/Stop on /pumps.
-ML_PER_SECOND = {1: 23.0, 2: 23.0, 3: 23.0, 4: 23.0}
+# (946 ml) took 40–42 s, so 22.5–23.7 ml/s. Set a bit higher on purpose, so
+# cups come out ~6–8% under their size rather than overflowing.
+# To re-measure: Start/Stop on /pumps.
+ML_PER_SECOND = {1: 25.0, 2: 25.0, 3: 25.0, 4: 25.0}
 
 MAX_QUEUE = 20          # orders waiting at once
 MAX_VOLUME_ML = 700

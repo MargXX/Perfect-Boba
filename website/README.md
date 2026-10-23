@@ -119,13 +119,14 @@ The dev page only writes a request; the ESP32 carries it out. When it sees `/mac
 
 ## How the recipe learns
 
-A recipe is two numbers: tea % (how strong) and sweetened creamer % (how creamy and sweet). Water fills the rest of the cup. `web/ml.js` learns them from ratings, separately for each person:
+A recipe is two numbers: tea % (how strong) and sweetened creamer % (how creamy and sweet). Water fills the rest of the cup. `web/ml.js` learns them from ratings, separately for each person and each tea:
 
 1. **Fit.** Every rated order (picky ones too) is a data point: tea % and creamer % → stars, plus the optional "weaker / perfect / stronger" and "less creamy / perfect / creamier". Gradient descent fits one curve for the whole group and a small correction for each person at the same time. Both start from a gentle guess that peaks at 35% tea and 15% creamer, so a few ratings can't swing it far. Orders from before the tea knob existed (creamer only) are skipped.
    - Your cup = group curve + your correction. Your correction starts at zero, so a newcomer gets the group's best cup, and since it sits on top of the *live* group curve, you keep benefiting as the group curve improves.
    - The correction's constant term learns whether you rate generously or harshly, so both kinds of rater are useful.
+   - Each tea gets a correction too (once there's more than one): a new tea starts from the group's taste and learns its own shift, like "this one needs more tea", while every rating still teaches the group curve.
    - "Creamier" tells the model which way your curve slopes at that cup. That points straight at a better cup, so it learns far faster than from stars alone.
-2. **Climb.** Gradient ascent on your curve finds the mix it predicts you'll rate highest, kept within tea 15–60% and creamer 5–30% (so never over a full cup) and within ~15% of each range from your last cup (a few answers say which way, not how far).
+2. **Climb.** Gradient ascent on your curve (for the tea you picked) finds the mix it predicts you'll rate highest. The only limit is the cup: tea + creamer ≤ 100%, so the robot is free to go wild.
 3. **Explore.** An **Order now** cup gets that best guess plus a random wiggle, so the model keeps learning. The wiggle shrinks as ratings pile up, overall and for you.
 
 People are recognised by a random ID saved on their phone, not by name, so lazy or duplicate names don't matter. The name box is remembered too. A new phone or cleared browser data means starting over as a newcomer.
