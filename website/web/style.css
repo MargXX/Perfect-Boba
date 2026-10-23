@@ -160,6 +160,10 @@ button.danger { background: var(--danger); }
 .segmented input:focus-visible + span { outline: 2px solid var(--accent-dark); }
 
 #teas { margin-bottom: 16px; }  /* space before the Order now button */
+.water-note {
+  background: #e3f1fb; color: #1d4f73; font-weight: 600;
+  padding: 12px 14px; border-radius: 12px; margin: 0 0 12px;
+}  /* space before the Order now button */
 #picky { margin-top: 8px; }
 #picky button { margin-top: 12px; }
 

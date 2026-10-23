@@ -312,7 +312,9 @@ def api(method, path, params, headers, body, ip):
     if path == "/api/poll":
         sync_clock(params.get("now"))
         state = {"is_busy": machine["is_busy"], "current_order_id": machine["current_order_id"],
-                 "paused": store.setting("paused", False)}
+                 "paused": store.setting("paused", False),
+                 # Without it, guests add the water themselves (see rate.html).
+                 "water_pump": NUM_PUMPS >= WATER_PUMP}
         if machine["clean"]:
             state["clean"] = machine["clean"]
         return "200 OK", json.dumps({"boot": BOOT, "chunks": store.versions,

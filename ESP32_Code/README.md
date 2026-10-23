@@ -81,7 +81,7 @@ No internet and no Firebase: the ESP32 makes its own WiFi network and serves the
 3. Make sure both pumps are **off**, then `./run.sh apps/boba_server.py`, or `./install.sh apps/boba_server.py` to run it from the wall. Both copy the website to the board first.
 4. Guests join the BobaBot WiFi and open **http://192.168.4.1**.
 
-How an order goes: guest orders → it waits in the queue → when it's their turn their phone says so (status `awaiting_cup`) → they put a cup under the spout and tap **My cup is in — pour!** → the machine runs tea for `volume_ml × tea %`, creamer for `volume_ml × creamer %`, and water for the rest → `done`, and their phone asks for a rating. Pumps above `NUM_PUMPS` are skipped, so until the water pump is fitted, cups come out short by their water share.
+How an order goes: guest orders → it waits in the queue → when it's their turn their phone says so (status `awaiting_cup`) → they put a cup under the spout and tap **My cup is in — pour!** → the machine runs tea for `volume_ml × tea %`, creamer for `volume_ml × creamer %`, and water for the rest → `done`, and their phone asks for a rating. Pumps above `NUM_PUMPS` are skipped, so until the water pump is fitted, cups come out short by their water share, and the rating page tells the guest how many oz of water to add themselves.
 
 - **Spam limits:** each phone can have one cup in the queue at a time (checked by its phone ID and its WiFi address), and the queue holds at most 20 (`MAX_QUEUE`). Guests can cancel while queued or when called up; the dev page can do anything.
 - **Dev tools:** `/dev` works as on the website (pause, Clean, mark done, cancel, delete, leaderboard edits), plus a **Manual pump control** link to `/pumps`.

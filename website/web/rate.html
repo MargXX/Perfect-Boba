@@ -11,6 +11,8 @@
   <h1>How was it?</h1>
   <p class="subtitle">Your rating trains the recipe.</p>
 
+  <p id="water-note" class="water-note" hidden></p>
+
   <div class="card">
     <div class="stars" id="stars">
       <button data-v="1">★</button><button data-v="2">★</button>
@@ -26,10 +28,25 @@
 </main>
 
 <script type="module">
-import { doc, updateDoc, db } from "/app.js";
+import { doc, getDoc, updateDoc, db, MACHINE_STATE } from "/app.js";
 import { KNOBS } from "/ml.js";
 
 const id = location.pathname.split("/").pop();
+
+// Until the machine has a water pump, it pours only the tea and creamer and
+// the guest adds the water. Shown only now, after pouring, so "Order now"
+// cups stay a mystery until they're in your hand.
+Promise.all([getDoc(doc(db, "orders", id)), getDoc(MACHINE_STATE)]).then(([order, machine]) => {
+  const o = order.data();
+  const r = o?.recipe;
+  if (!r || typeof r.tea !== "number" || machine.data()?.water_pump) return;
+  const waterOz = Math.round(o.size_oz * (100 - r.tea - r.creamer) / 100);
+  if (waterOz < 1) return;
+  const note = document.getElementById("water-note");
+  note.textContent = `💧 Top it up with about ${waterOz} oz of water from the fountain, until you have ${o.size_oz} oz. ` +
+    "The machine only pours tea and creamer for now.";
+  note.hidden = false;
+}).catch(() => {});
 let chosen = 0;
 
 // "Which way?" per knob. Optional, but it teaches the model much faster.
