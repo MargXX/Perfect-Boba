@@ -23,13 +23,13 @@
 </main>
 
 <script type="module">
-import { loadCupCounts, resolveDrinker, escapeHtml } from "/app.js";
+import { loadCupCounts, resolveName, getSavedName, escapeHtml } from "/app.js";
 
-const myPhone = localStorage.getItem("drinkerId");
+const myName = getSavedName();
 const medals = ["🥇", "🥈", "🥉"];
 const board = document.getElementById("board");
 
-Promise.all([loadCupCounts(), myPhone ? resolveDrinker(myPhone) : null]).then(([people, me]) => {
+Promise.all([loadCupCounts(), myName ? resolveName(myName) : null]).then(([people, me]) => {
   if (!people.length) {
     board.innerHTML = "<li>No cups made yet. Be the first!</li>";
     return;

@@ -107,9 +107,22 @@ function resolver(edits) {
   };
 }
 
-// Cups actually made (status done), per person. Ordering alone doesn't count,
+// The leaderboard counts people by name, ignoring case and extra spaces, so
+// "Ann" and "ann " are one person; /dev merges names that are the same person
+// ("Mike" into "Michael"). The key doubles as their /people doc ID. (The
+// recipe model still tells people apart by phone; see loadModel.)
+export function nameKey(name) {
+  const k = String(name || "").trim().replace(/\s+/g, " ").toLowerCase().replace(/\//g, "-") || "someone";
+  return k === "." || k === ".." ? `name ${k}` : k;
+}
+
+// /people docs from before the leaderboard went by name are keyed by phone ID.
+// loadModel still follows their merges; the leaderboard skips them.
+const isPhoneId = (id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$|^\d{20,}$/.test(id);
+
+// Cups actually made (status done), per name. Ordering alone doesn't count,
 // so nobody can climb the leaderboard by spamming orders. Each person shows
-// under their dev-set name, else the name from their latest order.
+// under their dev-set name, else the spelling from their latest order.
 // Returns everyone, hidden included; the public board filters them out.
 export async function loadPeople() {
   const [snap, edits] = await Promise.all([
@@ -122,13 +135,13 @@ export async function loadPeople() {
   };
   snap.forEach((d) => {
     const o = d.data();
-    if (!o.drinker_id) return;
-    const p = get(root(o.drinker_id));
+    const p = get(root(nameKey(o.name)));
     const t = o.created_at?.toMillis?.() ?? 0;
     p.made += 1;
     if (t >= p.latest) { p.latest = t; p.orderName = o.name; }
   });
   for (const [id, e] of edits) {
+    if (isPhoneId(id)) continue;
     const p = get(root(id));
     p.bonus += e.bonus || 0;
     if (e.merged_into) p.members.push(id);
@@ -146,9 +159,14 @@ export async function loadCupCounts() {
   return (await loadPeople()).filter((p) => !p.hidden && p.cups > 0);
 }
 
-// The phone ID this phone's orders count as, after any merges.
+// The phone ID this phone's orders count as, after any merges (for the model).
 export async function resolveDrinker(id) {
   return resolver(await loadPeopleEdits())(id);
+}
+
+// The leaderboard entry a name counts as, after any merges.
+export async function resolveName(name) {
+  return resolver(await loadPeopleEdits())(nameKey(name));
 }
 
 export async function countOrders() {

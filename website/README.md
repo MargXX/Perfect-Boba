@@ -7,7 +7,7 @@ The ordering + rating web app for Perfect Boba. Built on Firebase (Hosting + Fir
 - `/` — guests scan a QR on the machine, enter a name, how many liquid oz they want (8/12/16/20) and the tea, then either tap **🤖 Order now** (the model picks the mix) or **I'm picky** (set the mix yourself). Shows the total order count, and for returning guests "You've had N cups · #K on the leaderboard". It never shows what an **Order now** cup will be; that's meant to be a surprise.
 - `/queue` — live queue position, status pill, browser push + audio ding when it's your turn, auto-redirects to rate when done
 - `/rate/:id` — 1–5 stars after drinking, plus an optional "More tea / Perfect / More creamer"; trains the recipe model
-- `/leaderboard` — cups made per person (only orders that reached `done` count, so spamming orders doesn't help). People are grouped by their phone ID and shown under their latest name; no login needed.
+- `/leaderboard` — cups made per person (only orders that reached `done` count, so spamming orders doesn't help). People are grouped by name, ignoring case and extra spaces; `/dev` merges names that are the same person. No login needed.
 - `/admin` — read-only operator dashboard with active queue + recent completed orders
 - `/dev` — passcode-locked tools: pause/resume, hot-water clean, mark orders done, cancel, clear the queue, delete orders, model status, and leaderboard edits (merge two entries, ±1 cup, rename, hide)
 
@@ -37,7 +37,7 @@ Guests (any internet)  ──→  Firebase Hosting + Firestore
   rating: int | null                     # 1–5, set once after status is done
   feedback: { tea: -1|0|1, creamer: -1|0|1 }   # optional, with the rating: weaker/perfect/stronger, less creamy/perfect/creamier
 
-/people/{drinker_id}                      # dev edits to the leaderboard; orders are never rewritten
+/people/{name key}                        # dev edits to the leaderboard (key = lowercased name); orders are never rewritten
   bonus: int                               # cups to add (or take away, if negative)
   name: string | null                      # display name instead of their latest order's name
   hidden: bool
@@ -106,7 +106,7 @@ Tools: Node (`brew install node`) and the Firebase CLI (`npm install -g firebase
 - **Clear the queue**: `/dev` → passcode → **Clear queue (cancel all)**.
 - **Clean the machine**: put both intake tubes in hot water and a cup under the spout, then `/dev` → **Clean machine** → seconds → **Clean**. Until the ESP32 takes orders from the website, use **Clean** on the ESP32's phone page instead (`ESP32_Code/apps/pump_server.py`).
 - **Test without the machine**: place an order, mark it **Done** on `/dev`, then rate it from the page you ordered on.
-- **Fix the leaderboard**: `/dev` → **Leaderboard**. Merge two entries that are the same person (e.g. two phones), use −1/+1 to adjust cups, **Name** to rename, **Hide** to remove someone from the public board. Each change can be undone (**Unmerge**, **Show**, the opposite ±1).
+- **Fix the leaderboard**: `/dev` → **Leaderboard**. Merge two names that are the same person (e.g. Mike into Michael), use −1/+1 to adjust cups, **Name** to rename, **Hide** to remove someone from the public board. Each change can be undone (**Unmerge**, **Show**, the opposite ±1).
 - **Start the model over** (e.g. after testing): `/dev` → **Delete ALL orders and ratings**.
 
 ## What the ESP32 must do for cleaning

@@ -15,7 +15,7 @@ service cloud.firestore {
     }
 
     // Dev edits to the leaderboard (bonus cups, names, hiding, merges).
-    match /people/{drinkerId} {
+    match /people/{nameKey} {
       allow read: if true;
       allow write: if isDev();
     }

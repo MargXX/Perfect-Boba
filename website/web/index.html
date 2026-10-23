@@ -50,7 +50,7 @@
 <script type="module">
 import {
   ORDERS, MACHINE_STATE, SIZES_OZ, DEFAULT_OZ, TEAS, ozToMl, addDoc, onSnapshot, serverTimestamp, saveOrderId,
-  machineOnline, loadModel, countOrders, loadCupCounts, resolveDrinker, getDrinkerId, getSavedName, saveName
+  machineOnline, loadModel, countOrders, loadCupCounts, resolveDrinker, resolveName, getDrinkerId, getSavedName, saveName
 } from "/app.js";
 import { KNOBS, learn, forDrinker, pickRecipe } from "/ml.js";
 
@@ -103,7 +103,8 @@ document.getElementById("picky-toggle").addEventListener("click", () => {
   panel.hidden = !panel.hidden;
 });
 
-Promise.all([loadCupCounts(), meReady])
+// The leaderboard goes by name, so this only shows once this phone has ordered under a name.
+Promise.all([loadCupCounts(), getSavedName() ? resolveName(getSavedName()) : null])
   .then(([people, myId]) => {
     const rank = people.findIndex((p) => p.id === myId);
     if (rank < 0) return;

@@ -60,7 +60,7 @@
 
     <div class="card">
       <h2 style="margin-top:0">Leaderboard</h2>
-      <p class="hint" style="text-align:left">Merge two entries that are the same person (e.g. two phones),
+      <p class="hint" style="text-align:left">Merge two names that are the same person (e.g. Mike into Michael),
         add or take away cups, rename, or hide someone. Orders aren't changed, so all of this can be undone.</p>
       <div class="merge-row">
         <select id="merge-from" aria-label="Person to merge"></select>
@@ -133,7 +133,6 @@ async function eachBatch(docs, apply) {
 
 // Leaderboard edits live in /people/{phone id}; see loadPeople() in app.js.
 const editPerson = (id, fields) => setDoc(doc(PEOPLE, id), fields, { merge: true });
-const short = (id) => id.slice(0, 6);
 
 async function refreshPeople() {
   let people;
@@ -141,7 +140,7 @@ async function refreshPeople() {
     $("people").innerHTML = `<li>Couldn't load: ${escapeHtml(err.message)}</li>`; return;
   }
   const cups = (n) => `${n} ${n === 1 ? "cup" : "cups"}`;
-  const label = (p) => `${p.name} · ${cups(p.cups)} · ${short(p.id)}`;
+  const label = (p) => `${p.name} · ${cups(p.cups)}`;
   const options = people.map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(label(p))}</option>`).join("");
   $("merge-from").innerHTML = options;
   $("merge-into").innerHTML = options;
@@ -153,8 +152,8 @@ async function refreshPeople() {
     const li = document.createElement("li");
     const bonus = p.bonus ? ` (${p.made} made ${p.bonus > 0 ? "+" : "−"} ${Math.abs(p.bonus)})` : "";
     li.innerHTML = `<span>${escapeHtml(p.name)}${p.hidden ? ' <span class="status-pill cancelled">hidden</span>' : ""}
-        <br><small>${cups(p.cups)}${bonus} · ${short(p.id)}
-        ${p.members.length ? ` · merged: ${p.members.map(short).join(", ")}` : ""}</small></span>
+        <br><small>${cups(p.cups)}${bonus}
+        ${p.members.length ? ` · merged: ${escapeHtml(p.members.join(", "))}` : ""}</small></span>
       <span class="row-actions"></span>`;
     const actions = [
       ["−1", () => editPerson(p.id, { bonus: (p.bonusOwn || 0) - 1 })],
@@ -165,7 +164,7 @@ async function refreshPeople() {
         return editPerson(p.id, { name: name.trim() || null });
       }],
       [p.hidden ? "Show" : "Hide", () => editPerson(p.id, { hidden: !p.hidden })],
-      ...p.members.map((m) => [`Unmerge ${short(m)}`, () => editPerson(m, { merged_into: null })]),
+      ...p.members.map((m) => [`Unmerge ${m}`, () => editPerson(m, { merged_into: null })]),
     ];
     for (const [text, fn] of actions) {
       const b = document.createElement("button");
