@@ -159,6 +159,7 @@ button.danger { background: var(--danger); }
 .segmented input:checked + span small { color: white; }
 .segmented input:focus-visible + span { outline: 2px solid var(--accent-dark); }
 
+#teas { margin-bottom: 16px; }  /* space before the Order now button */
 #picky { margin-top: 8px; }
 #picky button { margin-top: 12px; }
 
