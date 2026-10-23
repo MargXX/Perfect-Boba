@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>BobaBot — Queue</title>
 <link rel="stylesheet" href="/style.css">
+<!-- Fetch every script at once rather than one import at a time (much faster on the ESP32). -->
+<link rel="modulepreload" href="/app.js">
+<link rel="modulepreload" href="/firebase.js">
+<link rel="modulepreload" href="/ml.js">
 </head>
 <body>
 <main>

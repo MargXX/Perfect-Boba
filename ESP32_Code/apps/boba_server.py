@@ -24,8 +24,10 @@ import asyncio
 import binascii
 import hashlib
 import json
+import machine as board
 import network
 import os
+import socket
 import time
 from machine import Pin, RTC
 
@@ -44,11 +46,11 @@ WATER_PUMP = 3
 # Pumps actually fitted. Pumps above this are skipped when pouring, so until
 # the water pump is fitted cups come out short by their water share.
 NUM_PUMPS = 2
-# How much each pump moves, in ml per second. Measured 2026-10-21: a quart
-# (946 ml) took 40–42 s, so 22.5–23.7 ml/s. Set a bit higher on purpose, so
-# cups come out ~6–8% under their size rather than overflowing.
+# How much each pump moves, in ml per second. Measured 2026-10-21: a liter
+# took 40–42 s, so 23.8–25 ml/s. Set a bit higher on purpose, so cups come
+# out ~7–12% under their size rather than overflowing.
 # To re-measure: Start/Stop on /pumps.
-ML_PER_SECOND = {1: 25.0, 2: 25.0, 3: 25.0, 4: 25.0}
+ML_PER_SECOND = {1: 27.0, 2: 27.0, 3: 27.0, 4: 27.0}
 
 MAX_QUEUE = 20          # orders waiting at once
 MAX_VOLUME_ML = 700
@@ -181,8 +183,8 @@ def add_order(o, is_dev, ip):
     if not is_dev:
         if len(store.active) >= MAX_QUEUE:
             raise Denied("The queue is full. Try again in a few minutes.")
-        for _, _, drinker, phone in store.active.values():
-            if drinker == o.get("drinker_id") or phone == ip:
+        for entry in store.active.values():
+            if entry[2] == o.get("drinker_id") or entry[3] == ip:
                 raise Denied("You already have a cup in the queue. One at a time!")
     return store.add(o, ip)
 
@@ -244,11 +246,13 @@ async def machine_step():
             machine["current_order_id"] = oid
             store.update(oid, {"status": "awaiting_cup"})
         return
-    order = store.get(oid)
-    if not order or order.get("status") != "awaiting_cup":
+    # From the in-memory index: reading the order's file twice a second
+    # would slow down the website.
+    entry = store.active.get(oid)
+    if not entry or entry[1] != "awaiting_cup":
         machine["current_order_id"] = None  # cancelled, deleted or marked done on /dev
-    elif order.get("cup_ready"):
-        await pour(oid, order)
+    elif entry[4]:  # cup_ready
+        await pour(oid, store.get(oid))
 
 
 async def pour(oid, order):
@@ -382,20 +386,29 @@ async def send(writer, code, body="", ctype="application/json", extra="Cache-Con
 
 
 async def send_file(writer, path, headers):
+    # tools/build_www.sh gzips the website (about a third of the size), and
+    # every browser can unzip it.
+    ctype = TYPES.get(path.rsplit(".", 1)[-1], "application/octet-stream")
+    encoding = ""
     try:
-        st = os.stat(path)
+        st = os.stat(path + ".gz")
+        path += ".gz"
+        encoding = "Content-Encoding: gzip\r\n"
     except OSError:
-        return await send(writer, "404 Not Found", "not found", "text/plain")
+        try:
+            st = os.stat(path)
+        except OSError:
+            return await send(writer, "404 Not Found", "not found", "text/plain")
     # Size and modified time: phones re-download a file only after it's reinstalled.
     etag = '"%d-%d"' % (st[6], st[8])
     if headers.get("if-none-match") == etag:
         return await send(writer, "304 Not Modified", extra="ETag: %s\r\n" % etag)
-    ctype = TYPES.get(path.rsplit(".", 1)[-1], "application/octet-stream")
-    writer.write(("HTTP/1.0 200 OK\r\nContent-Type: %s\r\nContent-Length: %d\r\nCache-Control: no-cache\r\n"
-                 "ETag: %s\r\nConnection: close\r\n\r\n" % (ctype, st[6], etag)).encode())
+    writer.write(("HTTP/1.0 200 OK\r\nContent-Type: %s\r\nContent-Length: %d\r\n%sCache-Control: no-cache\r\n"
+                 "ETag: %s\r\nConnection: close\r\n\r\n" % (ctype, st[6], encoding, etag)).encode())
+    # In big pieces: lots of small sends each wait on the phone's acknowledgement.
     with open(path, "rb") as f:
         while True:
-            chunk = f.read(1024)
+            chunk = f.read(8192)
             if not chunk:
                 break
             writer.write(chunk)
@@ -411,7 +424,17 @@ def parse_query(query):
     return params
 
 
+def no_delay(writer):
+    # Send small responses right away instead of waiting to batch them up.
+    try:
+        s = getattr(writer, "s", None) or writer.get_extra_info("socket")
+        s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+    except Exception:
+        pass
+
+
 async def handle(reader, writer):
+    no_delay(writer)
     try:
         request = (await reader.readline()).decode()
         headers = {}
@@ -485,6 +508,7 @@ def start_access_point():
 
 async def main():
     global store, pumps, my_ip
+    board.freq(240000000)  # full speed (the default is 160 MHz)
     # Three quick blinks: the program has started.
     for _ in range(3):
         led.on()
@@ -493,8 +517,8 @@ async def main():
         await asyncio.sleep_ms(150)
     store = Store()
     # A cup that was pouring when the power went out got an unknown amount.
-    for oid, (_, status, _, _) in list(store.active.items()):
-        if status == "dispensing":
+    for oid, entry in list(store.active.items()):
+        if entry[1] == "dispensing":
             store.update(oid, {"status": "error"})
     store.flush()
     await asyncio.sleep(STARTUP_SECONDS)

@@ -25,7 +25,7 @@ fi
 # mpremote skips files that haven't changed.
 if grep -q '"/www"' "$1"; then
   tools/build_www.sh
-  args=(exec "import os; 'www' in os.listdir('/') or os.mkdir('/www')")
+  args=(exec "import os; 'www' in os.listdir('/') or os.mkdir('/www'); [os.remove('/www/' + f) for f in os.listdir('/www') if not f.endswith('.gz')]")
   for f in www/*; do
     args+=(+ cp "$f" ":/www/$(basename "$f")")
   done

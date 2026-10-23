@@ -77,7 +77,7 @@ After changing anything in `lib/` or `apps/`, run `./install.sh …` again to up
 No internet and no Firebase: the ESP32 makes its own WiFi network and serves the same pages as https://perfect-boba-bot.web.app, with orders saved on its flash. Only phones on the BobaBot WiFi can order, so nobody can order from home.
 
 1. Add `DEV_PASSCODE = "..."` to `wifi_config.py` (see `wifi_config_example.py`). It unlocks `/dev` and `/pumps`.
-2. Set `NUM_PUMPS` (how many are fitted) and `ML_PER_SECOND` at the top of `apps/boba_server.py` (pump 1 = tea, 2 = sweetened creamer, 3 = water, 4 = a second tea). The Arduino sketch drives servos 1–2 only, so pumps 3–4 also need their servo pins added there. To measure a pump: on `/pumps`, tap **Start**, tap **Stop** when it has poured a known amount (1 qt = 946 ml), and divide the ml by the **Last run** seconds it shows.
+2. Set `NUM_PUMPS` (how many are fitted) and `ML_PER_SECOND` at the top of `apps/boba_server.py` (pump 1 = tea, 2 = sweetened creamer, 3 = water, 4 = a second tea). The Arduino sketch drives servos 1–2 only, so pumps 3–4 also need their servo pins added there. To measure a pump: on `/pumps`, tap **Start**, tap **Stop** when it has poured a known amount (1 L = 1000 ml), and divide the ml by the **Last run** seconds it shows.
 3. Make sure both pumps are **off**, then `./run.sh apps/boba_server.py`, or `./install.sh apps/boba_server.py` to run it from the wall. Both copy the website to the board first.
 4. Guests join the BobaBot WiFi and open **http://192.168.4.1**.
 

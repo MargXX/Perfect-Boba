@@ -61,9 +61,9 @@ class Store:
         self.people_version = 1
         self.versions = []  # per chunk file
         self.count = 0      # orders stored
-        # Orders still in progress: id -> [created_ms, status, drinker_id, phone ip].
+        # Orders still in progress: id -> [created_ms, status, drinker_id, phone ip, cup_ready].
         # Kept in memory so the machine and the one-order-per-phone check
-        # don't have to read every file.
+        # don't have to read files.
         self.active = {}
         self._open = {}     # chunk number -> {id: order}
         self._dirty = set()
@@ -131,7 +131,7 @@ class Store:
         if order and order.get("status") in ACTIVE:
             old = self.active.get(oid)
             self.active[oid] = [created_ms(order), order["status"], order.get("drinker_id"),
-                                ip or (old[3] if old else None)]
+                                ip or (old[3] if old else None), bool(order.get("cup_ready"))]
         else:
             self.active.pop(oid, None)
 
@@ -181,8 +181,8 @@ class Store:
     def oldest(self, status):
         """Id of the oldest order in progress with this status, or None."""
         best = None
-        for oid, (created, s, _, _) in self.active.items():
-            if s == status and (best is None or created < self.active[best][0]):
+        for oid, entry in self.active.items():
+            if entry[1] == status and (best is None or entry[0] < self.active[best][0]):
                 best = oid
         return best
 
