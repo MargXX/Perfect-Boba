@@ -37,10 +37,11 @@ service cloud.firestore {
           && request.resource.data.rating <= 5;
     }
 
-    // Guests can cancel an order that hasn't started yet.
+    // Guests can cancel an order that hasn't started pouring, including once
+    // it's their turn, so someone who walked away doesn't hold up the queue.
     function cancelling() {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status"])
-          && resource.data.status == "queued"
+          && resource.data.status in ["queued", "awaiting_cup"]
           && request.resource.data.status == "cancelled";
     }
 

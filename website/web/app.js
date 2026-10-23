@@ -18,7 +18,7 @@ export const ozToMl = (oz) => Math.round(oz * 29.5735);
 
 // Teas a guest can pick. The ESP32 maps each key to a pump (TEA_PUMPS in
 // ESP32_Code/apps/boba_server.py); add the second tea here and there.
-export const TEAS = [{ key: "black", label: "Black tea" }];
+export const TEAS = [{ key: "thai", label: "Thai tea" }];
 
 // The dev page signs in as this account; its password is the dev passcode.
 export const DEV_EMAIL = "dev@bobabot.local";

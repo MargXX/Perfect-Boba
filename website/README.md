@@ -30,7 +30,7 @@ Guests (any internet)  ──→  Firebase Hosting + Firestore
   mode: "ml" | "picky"
   size_oz: 8 | 12 | 16 | 20             # liquid fl oz chosen by the guest
   recipe: { tea: 0–100, creamer: 0–100 (% of the drink; water fills the rest, tea + creamer ≤ 100),
-            tea_type: "black" (TEAS in web/app.js), volume_ml: int (size_oz in ml, for the pumps) }
+            tea_type: "thai" (TEAS in web/app.js), volume_ml: int (size_oz in ml, for the pumps) }
   model: { n, n_mine, best, predicted } | null  # what the model knew when it picked an "ml" recipe
   status: queued | awaiting_cup | dispensing | done | cancelled | error
   created_at: timestamp (server)
@@ -53,7 +53,7 @@ Guests (any internet)  ──→  Firebase Hosting + Firestore
 Rules in `firestore.rules`:
 - Anyone can create orders (with `status: "queued"` and `rating: null`)
 - Anyone can rate an order once (1–5, plus optional feedback), only after it's `done`
-- Anyone can cancel an order that's still `queued`
+- Anyone can cancel an order that's still `queued` or `awaiting_cup`, and mark their `awaiting_cup` order `cup_ready`
 - Anyone can read `/people`; only dev can write it
 - The machine account (`machine@bobabot.local`) and the dev account (`dev@bobabot.local`) can change order status and write `/machine/state`; only dev can delete orders. The rules recognise them by their sign-in email (a `role` custom claim from `tools/grant_machine_role.js` also works).
 
@@ -121,11 +121,11 @@ The dev page only writes a request; the ESP32 carries it out. When it sees `/mac
 
 A recipe is two numbers: tea % (how strong) and sweetened creamer % (how creamy and sweet). Water fills the rest of the cup. `web/ml.js` learns them from ratings, separately for each person:
 
-1. **Fit.** Every rated order (picky ones too) is a data point: tea % and creamer % → stars, plus the optional "weaker / perfect / stronger" and "less creamy / perfect / creamier". Gradient descent fits one curve for the whole group and a small correction for each person at the same time. Both start from a gentle guess that peaks at 35% tea and 25% creamer, so a few ratings can't swing it far. Orders from before the tea knob existed (creamer only) are skipped.
+1. **Fit.** Every rated order (picky ones too) is a data point: tea % and creamer % → stars, plus the optional "weaker / perfect / stronger" and "less creamy / perfect / creamier". Gradient descent fits one curve for the whole group and a small correction for each person at the same time. Both start from a gentle guess that peaks at 35% tea and 15% creamer, so a few ratings can't swing it far. Orders from before the tea knob existed (creamer only) are skipped.
    - Your cup = group curve + your correction. Your correction starts at zero, so a newcomer gets the group's best cup, and since it sits on top of the *live* group curve, you keep benefiting as the group curve improves.
    - The correction's constant term learns whether you rate generously or harshly, so both kinds of rater are useful.
    - "Creamier" tells the model which way your curve slopes at that cup. That points straight at a better cup, so it learns far faster than from stars alone.
-2. **Climb.** Gradient ascent on your curve finds the mix it predicts you'll rate highest, kept within tea 15–60% and creamer 5–40% (so never over a full cup) and within ~15% of each range from your last cup (a few answers say which way, not how far).
+2. **Climb.** Gradient ascent on your curve finds the mix it predicts you'll rate highest, kept within tea 15–60% and creamer 5–30% (so never over a full cup) and within ~15% of each range from your last cup (a few answers say which way, not how far).
 3. **Explore.** An **Order now** cup gets that best guess plus a random wiggle, so the model keeps learning. The wiggle shrinks as ratings pile up, overall and for you.
 
 People are recognised by a random ID saved on their phone, not by name, so lazy or duplicate names don't matter. The name box is remembered too. A new phone or cleared browser data means starting over as a newcomer.

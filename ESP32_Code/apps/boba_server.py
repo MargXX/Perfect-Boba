@@ -38,7 +38,7 @@ from store import Store
 # Which servo presses which pump's button. Orders say how much of the cup is
 # tea and creamer (%); water fills the rest. Each tea type gets its own pump
 # (keys match TEAS in website/web/app.js); a second tea would go on pump 4.
-TEA_PUMPS = {"black": 1}
+TEA_PUMPS = {"thai": 1}
 CREAMER_PUMP = 2   # sweetened creamer
 WATER_PUMP = 3
 # Pumps actually fitted. Pumps above this are skipped when pouring, so until
@@ -195,8 +195,7 @@ def update_order(oid, f, is_dev):
         rating = (keys <= {"rating", "feedback"} and isinstance(f.get("rating"), int)
                   and 1 <= f["rating"] <= 5 and isinstance(f.get("feedback", {}), dict)
                   and status == "done" and o.get("rating") is None)
-        # Unlike the website, guests can also cancel once it's their turn, so
-        # someone who walked away doesn't hold up the queue.
+        # Also once it's their turn, so someone who walked away doesn't hold up the queue.
         cancel = (keys == {"status"} and f["status"] == "cancelled"
                   and status in ("queued", "awaiting_cup"))
         cup = keys == {"cup_ready"} and f["cup_ready"] is True and status == "awaiting_cup"
@@ -209,7 +208,7 @@ def update_order(oid, f, is_dev):
 
 def pump_times(recipe):
     """{pump: seconds} for a recipe like
-    {"tea": 35, "creamer": 25, "tea_type": "black", "volume_ml": 355}."""
+    {"tea": 35, "creamer": 15, "tea_type": "thai", "volume_ml": 355}."""
     ml = recipe["volume_ml"] / 100
     tea_ml = ml * recipe["tea"]
     creamer_ml = ml * recipe["creamer"]

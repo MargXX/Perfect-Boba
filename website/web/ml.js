@@ -30,7 +30,7 @@ export const KNOBS = [
     describe: (v) => `${v}%`,
   },
   {
-    key: "creamer", label: "Sweet creamer", min: 5, max: 40, default: 25,
+    key: "creamer", label: "Sweet creamer", min: 5, max: 30, default: 15,
     less: "Less creamy", more: "Creamier",
     describe: (v) => `${v}%`,
   },
